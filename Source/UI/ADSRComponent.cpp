@@ -45,7 +45,7 @@ void ADSRComponent::paint (juce::Graphics& g)
 
     g.fillAll (juce::Colour(0xff4A90E2));
 
-    g.setColour (juce::Colours::grey);
+    g.setColour (juce::Colours::white);
     g.drawRect (getLocalBounds(), 1);   // draw an outline around the component
 
     g.setColour (juce::Colours::white);

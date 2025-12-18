@@ -11,15 +11,14 @@
 
 //==============================================================================
 BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProcessor& p)
-    : AudioProcessorEditor (&p), audioProcessor (p), adsr (audioProcessor.apvts)
+    : AudioProcessorEditor (&p), audioProcessor (p), osc (audioProcessor.apvts, "OSC1WAVETYPE"), adsr (audioProcessor.apvts)
 {
     // Make sure that before the constructor has finished, you've set the
     // editor's size to whatever you need it to be.
     setSize (600, 400);
-    
-    oscSelectAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(audioProcessor.apvts, "OSC", oscSelector);
-    
-    //make adsr visible
+
+    // Make visible
+    addAndMakeVisible(osc);
     addAndMakeVisible (adsr);
 }
 
@@ -44,6 +43,7 @@ void BlueSynthAudioProcessorEditor::paint (juce::Graphics& g)
 
 void BlueSynthAudioProcessorEditor::resized()
 {
-    // set adsr bounds
+    osc.setBounds(10, 10, 100, 30);
+    // Set adsr bounds
     adsr.setBounds(getWidth() / 2, 0, getWidth() / 2, getHeight());
 }
