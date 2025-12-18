@@ -180,7 +180,7 @@ void BlueSynthAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
             auto& release = *apvts.getRawParameterValue("RELEASE");
             
             // atomic float?
-            voice->updateADSR (attack.load(), decay.load(), sustain.load(), release.load());
+            voice->update(attack.load(), decay.load(), sustain.load(), release.load());
         }
     }
         
