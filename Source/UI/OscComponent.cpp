@@ -14,7 +14,7 @@
 //==============================================================================
 OscComponent::OscComponent(juce::AudioProcessorValueTreeState& apvts, juce::String waveSelectorId)
 {
-    juce::StringArray choices { "Sine", "Saw", "Saw Inverse" "Square", "Triangle", "Pulse 1", "Pulse 2", "Noise" };
+    juce::StringArray choices { "Sine", "Saw", "Saw Inverse", "Square", "Triangle", "Pulse 1", "Pulse 2", "Noise" };
     oscWaveSelector.addItemList (choices, 1);
     addAndMakeVisible (oscWaveSelector);
     
