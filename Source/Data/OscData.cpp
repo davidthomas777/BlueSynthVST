@@ -33,12 +33,48 @@ void OscData::setWaveType (const int choice)
             // Saw wave
             initialise([](float x) {return x / juce::MathConstants<float>::pi;});
             break;
-            
+        
         case 2:
+            // Inverse saw wave
+            initialise([](float x) { return -x / juce::MathConstants<float>::pi; });
+            break;
+            
+        case 3:
             // Square wave
             initialise([](float x) {return x < 0.0f ? -1.0f : 1.0f;});
             break;
         
+        case 4:
+            // Triangle wave
+            initialise([](float x) {
+                return 2.0f * std::abs(2.0f * ((x / juce::MathConstants<float>::twoPi) - std::floor((x / juce::MathConstants<float>::twoPi) + 0.5f))) - 1.0f;});
+            break;
+        
+        case 5:
+            // Pulse wave 1
+            initialise([](float x) {
+                float phase = (x + juce::MathConstants<float>::pi) / juce::MathConstants<float>::twoPi;
+                phase = phase - std::floor(phase);
+                return phase < 0.25f ? 1.0f : -1.0f;
+            });
+            break;
+        
+        case 6:
+            // Pulse wave 2
+            initialise([](float x) {
+                float phase = (x + juce::MathConstants<float>::pi) / juce::MathConstants<float>::twoPi;
+                phase = phase - std::floor(phase);
+                return phase < 0.125f ? 1.0f : -1.0f;
+            });
+            break;
+        
+        case 7:
+            // Noise
+            initialise([](float x) {
+                return juce::Random::getSystemRandom().nextFloat();
+            });
+            break;
+            
         default:
             jassertfalse; // You're not supposed to be here!
             break;
