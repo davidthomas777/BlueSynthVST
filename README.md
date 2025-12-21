@@ -1,6 +1,7 @@
 **BlueSynth: VST**
 
 A Synth VST Project with AI sound-design features created by David Thomas, Ellis Day, Adithya Prashanth, and Mihir Borkar, all current undergraduate students at the University of California - Irvine
+
 Working with SoundEthics (soundethics.org) and AI@UCI
 
 **Overview:**
