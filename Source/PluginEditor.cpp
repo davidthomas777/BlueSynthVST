@@ -18,7 +18,7 @@ BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProc
     setSize (600, 400);
 
     // Make visible
-    addAndMakeVisible(osc);
+    addAndMakeVisible (osc);
     addAndMakeVisible (adsr);
 }
 

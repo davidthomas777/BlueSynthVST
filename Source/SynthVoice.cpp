@@ -16,7 +16,7 @@ bool SynthVoice::canPlaySound (juce::SynthesiserSound* sound) {
 }
 void SynthVoice::startNote (int midiNoteNumber, float velocity, juce::SynthesiserSound *sound, int currentPitchWheelPosition) {
     // when start note plays, osc frequency is set to midiNoteNumber converted
-    osc.setFrequency(juce::MidiMessage::getMidiNoteInHertz (midiNoteNumber));
+    osc.setWaveFrequency(midiNoteNumber);
     adsr.noteOn();
 }
 void SynthVoice::stopNote (float velocity, bool allowTailOff) {
@@ -46,7 +46,7 @@ void SynthVoice::prepareToPlay(double sampleRate, int samplesPerBlock, int outpu
     // set numChannels to current number of output channels
     spec.numChannels = outputChannels;
     
-    osc.prepare(spec);
+    osc.prepareToPlay (spec);
     gain.prepare (spec);
     gain.setGainLinear(0.3f);
     
@@ -69,8 +69,10 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer< float > &outputBuffer, int 
     
     // create an audioblock wrapper around an existing audio buffer (for DSP operation)
     juce::dsp::AudioBlock<float> audioBlock { synthBuffer };
+    
     // process the audio block through the oscillator we created called osc
-    osc.process (juce::dsp::ProcessContextReplacing<float> (audioBlock));
+    osc.getNextAudioBlock(audioBlock);
+    
     // process the audio block into gain so we can turn down volume
     gain.process(juce::dsp::ProcessContextReplacing<float> (audioBlock));
     
