@@ -74,7 +74,15 @@ void ADSRComponent::resized()
 void ADSRComponent::setSliderParams (juce::Slider& slider)
 {
     slider.setSliderStyle(juce::Slider::SliderStyle::LinearVertical);
-    slider.setTextBoxStyle (juce::Slider::TextBoxBelow, true, 50, 25);
+    slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 40, 25);
+    
+    slider.textFromValueFunction = [](double value) {
+        return juce::String(value, 2);
+    };
+    
+    slider.valueFromTextFunction = [](const juce::String& text) {
+        return text.getDoubleValue();
+    };
     
     slider.setColour(juce::Slider::trackColourId, juce::Colours::white);
     slider.setColour(juce::Slider::thumbColourId, juce::Colours::white);
