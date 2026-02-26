@@ -1,0 +1,8 @@
+# macOS
+.DS_Store
+
+# JUCE Build files
+Builds/
+builds/
+Build/
+build/
