@@ -11,13 +11,15 @@
 
 //==============================================================================
 BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProcessor& p)
-    : AudioProcessorEditor (&p), audioProcessor (p), osc (audioProcessor.apvts, "OSC1WAVETYPE", "OSC1FMFREQ", "OSCFMDEPTH"), adsr (audioProcessor.apvts)
+    : AudioProcessorEditor (&p), audioProcessor (p), osc (audioProcessor.apvts, "FMFREQ", "FMDEPTH"), adsr (audioProcessor.apvts)
 {
-    // Make sure that before the constructor has finished, you've set the
-    // editor's size to whatever you need it to be.
-    setSize (600, 400);
+    setSize (750, 500);
 
-    // Make visible
+    juce::StringArray waveChoices { "Sine", "Saw", "Saw Inverse", "Square", "Triangle", "Pulse 1", "Pulse 2", "Noise" };
+    oscWaveSelector.addItemList (waveChoices, 1);
+    addAndMakeVisible (oscWaveSelector);
+    waveSelectorAttachment = std::make_unique<ComboBoxAttachment> (audioProcessor.apvts, "OSC1WAVETYPE", oscWaveSelector);
+
     addAndMakeVisible (osc);
     addAndMakeVisible (adsr);
 }
@@ -29,21 +31,19 @@ BlueSynthAudioProcessorEditor::~BlueSynthAudioProcessorEditor()
 //==============================================================================
 void BlueSynthAudioProcessorEditor::paint (juce::Graphics& g)
 {
-    // (Our component is opaque, so we must completely fill the background with a solid colour)
     g.fillAll (juce::Colour(0xff4A90E2));
-    
-    // BlueSynth Main Text
+
     g.setColour (juce::Colours::white);
-    g.setFont(juce::FontOptions("Courier New", 15.0f, juce::Font::bold));
-    g.setFont(juce::FontOptions("Consolas", 15.0f, juce::Font::bold));
-    g.setFont(juce::FontOptions("Monaco", 15.0f, juce::Font::bold));
-    
-    // g.drawFittedText("BLUE SYNTH", juce::Rectangle<int>(0, 0, getWidth(), 30), juce::Justification::centred, 1);
+    g.setFont (juce::FontOptions (16.0f).withStyle ("Bold"));
+    g.drawText ("BLUESYNTH", 0, 5, getWidth(), 20, juce::Justification::centred);
 }
 
 void BlueSynthAudioProcessorEditor::resized()
 {
-    osc.setBounds(10, 10, 180, 200);
-    // Set adsr bounds
-    adsr.setBounds(getWidth() / 2, 0, getWidth() / 2, getHeight());
+    const auto panelWidth = 280;
+    const auto panelX    = (getWidth() - panelWidth) / 2;
+
+    oscWaveSelector.setBounds (panelX, 30, panelWidth, 24);
+    adsr.setBounds            (panelX, 58, panelWidth, 165);
+    osc.setBounds             (panelX, 228, panelWidth, 100);
 }

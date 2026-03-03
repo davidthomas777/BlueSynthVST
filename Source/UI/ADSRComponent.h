@@ -24,12 +24,17 @@ public:
     void resized() override;
 
 private:
-    void setSliderParams(juce::Slider& slider);
-    // Create Sliders and Combobox to control oscialltor choice
+    void setSliderParams (juce::Slider& slider, juce::Label& label, const juce::String& labelText);
+
     juce::Slider attackSlider;
     juce::Slider decaySlider;
     juce::Slider sustainSlider;
     juce::Slider releaseSlider;
+
+    juce::Label attackLabel;
+    juce::Label decayLabel;
+    juce::Label sustainLabel;
+    juce::Label releaseLabel;
     
     // name space adjustment
     using SliderAttachment = juce::AudioProcessorValueTreeState::SliderAttachment;

@@ -32,5 +32,9 @@ private:
     OscComponent osc;
     ADSRComponent adsr;
 
+    juce::ComboBox oscWaveSelector;
+    using ComboBoxAttachment = juce::AudioProcessorValueTreeState::ComboBoxAttachment;
+    std::unique_ptr<ComboBoxAttachment> waveSelectorAttachment;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (BlueSynthAudioProcessorEditor)
 };
