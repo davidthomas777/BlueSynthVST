@@ -20,6 +20,8 @@
       <FILE id="SiNi3x" name="AdsrData.h" compile="0" resource="0" file="Source/Data/AdsrData.h"/>
       <FILE id="AXJpFB" name="OscData.cpp" compile="1" resource="0" file="Source/Data/OscData.cpp"/>
       <FILE id="T94f10" name="OscData.h" compile="0" resource="0" file="Source/Data/OscData.h"/>
+      <FILE id="Fd3r1A" name="FilterData.cpp" compile="1" resource="0" file="Source/Data/FilterData.cpp"/>
+      <FILE id="Gx7mBc" name="FilterData.h" compile="0" resource="0" file="Source/Data/FilterData.h"/>
     </GROUP>
     <GROUP id="{62270905-B2F4-6EEB-C633-ED3DC0854DFD}" name="UI">
       <FILE id="KES7NP" name="ADSRComponent.cpp" compile="1" resource="0"
@@ -28,6 +30,9 @@
       <FILE id="oOzpeN" name="OscComponent.cpp" compile="1" resource="0"
             file="Source/UI/OscComponent.cpp"/>
       <FILE id="UkcmY2" name="OscComponent.h" compile="0" resource="0" file="Source/UI/OscComponent.h"/>
+      <FILE id="Hk9pQz" name="FilterComponent.cpp" compile="1" resource="0"
+            file="Source/UI/FilterComponent.cpp"/>
+      <FILE id="Jm2vRx" name="FilterComponent.h" compile="0" resource="0" file="Source/UI/FilterComponent.h"/>
     </GROUP>
   </MAINGROUP>
   <MODULES>

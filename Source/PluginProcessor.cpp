@@ -32,7 +32,7 @@ BlueSynthAudioProcessor::BlueSynthAudioProcessor()
 
 BlueSynthAudioProcessor::~BlueSynthAudioProcessor()
 {
-    
+
 }
 
 //==============================================================================
@@ -103,12 +103,12 @@ void BlueSynthAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBl
     // Use this method as the place to do any pre-playback
     // initialisation that you need..
     synth.setCurrentPlaybackSampleRate(sampleRate);
-    
+
     for (int i = 0; i < synth.getNumVoices(); i++)
     {
         if (auto voice = dynamic_cast<SynthVoice*>(synth.getVoice(i)))
         {
-            voice->prepareToPlay(sampleRate, samplesPerBlock, getTotalNumInputChannels());
+            voice->prepareToPlay(sampleRate, samplesPerBlock, getTotalNumOutputChannels());
         }
     }
 }
@@ -151,22 +151,9 @@ void BlueSynthAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
     auto totalNumInputChannels  = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
 
-    // In case we have more outputs than inputs, this code clears any output
-    // channels that didn't contain input data, (because these aren't
-    // guaranteed to be empty - they may contain garbage).
-    // This is here to avoid people getting screaming feedback
-    // when they first compile a plugin, but obviously you don't need to keep
-    // this code if your algorithm always overwrites all the output channels.
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear (i, 0, buffer.getNumSamples());
 
-    // This is the place where you'd normally do the guts of your plugin's
-    // audio processing...
-    // Make sure to reset the state if your inner loop is processing
-    // the samples and the outer loop is handling the channels.
-    // Alternatively, you can process the samples with the channels
-    // interleaved by keeping the same state.
-    
     // refers to synth voice class num voices
     for (int i = 0; i < synth.getNumVoices(); ++i)
     {
@@ -174,23 +161,40 @@ void BlueSynthAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
         if (auto voice = dynamic_cast<SynthVoice*>(synth.getVoice(i)))
         {
             // OSC Controls, ADSR, LFO, FM
-            auto& attack = *apvts.getRawParameterValue("ATTACK");
-            auto& decay = *apvts.getRawParameterValue("DECAY");
+            auto& attack  = *apvts.getRawParameterValue("ATTACK");
+            auto& decay   = *apvts.getRawParameterValue("DECAY");
             auto& sustain = *apvts.getRawParameterValue("SUSTAIN");
             auto& release = *apvts.getRawParameterValue("RELEASE");
-            
+
             auto& oscWaveChoice = *apvts.getRawParameterValue("OSC1WAVETYPE");
-            
+
             auto& fmDepth = *apvts.getRawParameterValue("FMDEPTH");
-            auto& fmFreq = *apvts.getRawParameterValue("FMFREQ");
+            auto& fmFreq  = *apvts.getRawParameterValue("FMFREQ");
+
+            // Filter controls
+            auto& filterCutoff  = *apvts.getRawParameterValue("FILTERCUTOFF");
+            auto& filterRes     = *apvts.getRawParameterValue("FILTERRES");
+            auto& filterEnvAmt  = *apvts.getRawParameterValue("FILTERENVAMT");
+            auto& filterType    = *apvts.getRawParameterValue("FILTERTYPE");
+
+            // Filter envelope
+            auto& fEnvAtk = *apvts.getRawParameterValue("FILTERENVATTACK");
+            auto& fEnvDec = *apvts.getRawParameterValue("FILTERENVDECAY");
+            auto& fEnvSus = *apvts.getRawParameterValue("FILTERENVSUSTAIN");
+            auto& fEnvRel = *apvts.getRawParameterValue("FILTERENVRELEASE");
 
             voice->getOscillator().setWaveType (oscWaveChoice);
             voice->getOscillator().setFmParams (fmDepth, fmFreq);
             voice->update (attack.load(), decay.load(), sustain.load(), release.load());
+
+            voice->updateFilter (filterCutoff.load(), filterRes.load(), filterEnvAmt.load(), static_cast<int>(filterType.load()));
+            voice->updateFilterEnv (fEnvAtk.load(), fEnvDec.load(), fEnvSus.load(), fEnvRel.load());
         }
     }
-        
+
     synth.renderNextBlock (buffer, midiMessages, 0, buffer.getNumSamples());
+
+    buffer.applyGain (apvts.getRawParameterValue ("MASTERGAIN")->load());
 }
 
 //==============================================================================
@@ -231,21 +235,36 @@ juce::AudioProcessorValueTreeState::ParameterLayout BlueSynthAudioProcessor::cre
     // Combobox: switch oscillator
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
     params.push_back (std::make_unique<juce::AudioParameterChoice> ("OSC", "Oscillator", juce::StringArray {"Sine", "Saw", "Square"}, 0));
-    
+
     // FM Frequency
     params.push_back (std::make_unique<juce::AudioParameterFloat>("FMFREQ", "FM Frequency", juce::NormalisableRange<float> {0.0f, 1000.0f, 0.01f, 0.3f}, 0.0f));
-    
+
     // FM Depth
     params.push_back (std::make_unique<juce::AudioParameterFloat>("FMDEPTH", "FM Depth", juce::NormalisableRange<float> {0.0f, 1000.0f, 0.01f, 0.3f}, 0.0f));
-    
-    // ADSR
-    params.push_back (std::make_unique<juce::AudioParameterFloat>("ATTACK", "Attack", juce::NormalisableRange<float> {0.0f, 1.0f, 0.01f}, 0.1f));
-    params.push_back (std::make_unique<juce::AudioParameterFloat>("DECAY", "Decay", juce::NormalisableRange<float> {0.0f, 1.0f, 0.01f}, 0.1f));
-    params.push_back (std::make_unique<juce::AudioParameterFloat>("SUSTAIN", "Sustain", juce::NormalisableRange<float> {0.0f, 1.0f, 0.01f,}, 1.0f));
+
+    // Amplitude ADSR
+    params.push_back (std::make_unique<juce::AudioParameterFloat>("ATTACK",  "Attack",  juce::NormalisableRange<float> {0.0f, 1.0f, 0.01f}, 0.1f));
+    params.push_back (std::make_unique<juce::AudioParameterFloat>("DECAY",   "Decay",   juce::NormalisableRange<float> {0.0f, 1.0f, 0.01f}, 0.1f));
+    params.push_back (std::make_unique<juce::AudioParameterFloat>("SUSTAIN", "Sustain", juce::NormalisableRange<float> {0.0f, 1.0f, 0.01f}, 1.0f));
     params.push_back (std::make_unique<juce::AudioParameterFloat>("RELEASE", "Release", juce::NormalisableRange<float> {0.0f, 3.0f, 0.01f}, 0.4f));
-    
+
     // WaveType Parameter
     params.push_back (std::make_unique<juce::AudioParameterChoice>("OSC1WAVETYPE", "Osc 1 Wave Type", juce::StringArray {"Sine", "Saw", "Saw Inverse", "Square", "Triangle", "Pulse 1", "Pulse 2", "Noise"}, 0));
-    
+
+    // Master Gain
+    params.push_back (std::make_unique<juce::AudioParameterFloat>("MASTERGAIN", "Master Gain", juce::NormalisableRange<float> {0.0f, 1.0f, 0.01f}, 0.5f));
+
+    // Filter
+    params.push_back (std::make_unique<juce::AudioParameterChoice>("FILTERTYPE", "Filter Type", juce::StringArray {"Low Pass", "High Pass", "Band Pass"}, 0));
+    params.push_back (std::make_unique<juce::AudioParameterFloat>("FILTERCUTOFF", "Filter Cutoff", juce::NormalisableRange<float> {20.0f, 20000.0f, 0.1f, 0.3f}, 20000.0f));
+    params.push_back (std::make_unique<juce::AudioParameterFloat>("FILTERRES",    "Filter Resonance", juce::NormalisableRange<float> {0.0f, 1.0f, 0.01f}, 0.1f));
+    params.push_back (std::make_unique<juce::AudioParameterFloat>("FILTERENVAMT", "Filter Env Amount", juce::NormalisableRange<float> {-1.0f, 1.0f, 0.01f}, 0.0f));
+
+    // Filter envelope ADSR
+    params.push_back (std::make_unique<juce::AudioParameterFloat>("FILTERENVATTACK",  "Filter Env Attack",  juce::NormalisableRange<float> {0.0f, 1.0f, 0.01f}, 0.1f));
+    params.push_back (std::make_unique<juce::AudioParameterFloat>("FILTERENVDECAY",   "Filter Env Decay",   juce::NormalisableRange<float> {0.0f, 1.0f, 0.01f}, 0.1f));
+    params.push_back (std::make_unique<juce::AudioParameterFloat>("FILTERENVSUSTAIN", "Filter Env Sustain", juce::NormalisableRange<float> {0.0f, 1.0f, 0.01f}, 1.0f));
+    params.push_back (std::make_unique<juce::AudioParameterFloat>("FILTERENVRELEASE", "Filter Env Release", juce::NormalisableRange<float> {0.0f, 3.0f, 0.01f}, 0.4f));
+
     return { params.begin(), params.end() };
 }

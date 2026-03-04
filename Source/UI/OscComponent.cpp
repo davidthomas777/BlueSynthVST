@@ -54,16 +54,17 @@ void OscComponent::setSliderWithLabel (juce::Slider& slider, juce::Label& label,
 {
     slider.setSliderStyle (juce::Slider::SliderStyle::RotaryHorizontalDrag);
     slider.setTextBoxStyle (juce::Slider::TextBoxBelow, true, 45, 18);
-    slider.setColour (juce::Slider::thumbColourId,           juce::Colours::white);
-    slider.setColour (juce::Slider::rotarySliderFillColourId, juce::Colours::white);
-    slider.setColour (juce::Slider::textBoxTextColourId,     juce::Colours::white);
-    slider.setColour (juce::Slider::textBoxOutlineColourId,  juce::Colours::white);
+    slider.setColour (juce::Slider::thumbColourId,              juce::Colours::white);
+    slider.setColour (juce::Slider::rotarySliderFillColourId,   juce::Colours::white);
+    slider.setColour (juce::Slider::rotarySliderOutlineColourId, juce::Colours::black);
+    slider.setColour (juce::Slider::textBoxTextColourId,        juce::Colours::white);
+    slider.setColour (juce::Slider::textBoxOutlineColourId,     juce::Colours::white);
     addAndMakeVisible (slider);
 
     attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, paramId, slider);
     
     label.setColour (juce::Label::ColourIds::textColourId, juce::Colours::white);
-    label.setFont (juce::FontOptions (14.0f).withStyle ("Bold"));
+    label.setFont (juce::FontOptions (12.0f).withStyle ("Bold"));
     label.setJustificationType (juce::Justification::centred);
     addAndMakeVisible (label);
 }
