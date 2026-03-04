@@ -12,6 +12,7 @@
 #include "PluginProcessor.h"
 #include "UI/ADSRComponent.h"
 #include "UI/OscComponent.h"
+#include "UI/FilterComponent.h"
 
 //==============================================================================
 /**
@@ -29,11 +30,20 @@ public:
 private:
     // This is a reference to our audioProcessor
     BlueSynthAudioProcessor& audioProcessor;
-    OscComponent osc;
-    ADSRComponent adsr;
+    OscComponent      osc;
+    ADSRComponent     adsr;
+    FilterComponent   filterComponent;
+    ADSRComponent     filterEnv;
+
+    juce::Slider gainSlider;
+    juce::Label  gainLabel;
 
     juce::ComboBox oscWaveSelector;
+
+    using SliderAttachment   = juce::AudioProcessorValueTreeState::SliderAttachment;
     using ComboBoxAttachment = juce::AudioProcessorValueTreeState::ComboBoxAttachment;
+
+    std::unique_ptr<SliderAttachment>   gainAttachment;
     std::unique_ptr<ComboBoxAttachment> waveSelectorAttachment;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (BlueSynthAudioProcessorEditor)
