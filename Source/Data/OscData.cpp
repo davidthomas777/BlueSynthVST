@@ -98,10 +98,25 @@ void OscData::getNextAudioBlock (juce::dsp::AudioBlock<float>& block)
     process (juce::dsp::ProcessContextReplacing<float> (block));
 }
 
+void OscData::setWaveFrequencyDetune (int midiNoteNumber, float detuneSemitones)
+{
+    lastMidiNote          = midiNoteNumber;
+    lastBaseHz            = juce::MidiMessage::getMidiNoteInHertz (midiNoteNumber);
+    detuneOffsetSemitones = detuneSemitones;
+    setFrequency (lastBaseHz * std::pow (2.0f, detuneSemitones / 12.0f) + fmMod);
+}
+
+void OscData::setWaveFrequencyHz (float baseHz, float detuneSemitones)
+{
+    lastBaseHz            = baseHz;
+    detuneOffsetSemitones = detuneSemitones;
+    setFrequency (baseHz * std::pow (2.0f, detuneSemitones / 12.0f) + fmMod);
+}
+
 void OscData::setFmParams (const float depth, const float freq)
 {
     fmOsc.setFrequency (freq);
     fmDepth = depth;
-    auto currentFreq = juce::MidiMessage::getMidiNoteInHertz (lastMidiNote) + fmMod;
-    setFrequency (currentFreq >= 0 ? currentFreq : currentFreq * -1.0f);
+    float currentFreq = lastBaseHz * std::pow (2.0f, detuneOffsetSemitones / 12.0f) + fmMod;
+    setFrequency (currentFreq >= 0.0f ? currentFreq : -currentFreq);
 }
