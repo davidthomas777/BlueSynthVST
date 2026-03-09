@@ -12,10 +12,15 @@
 #include "OscComponent.h"
 
 //==============================================================================
-OscComponent::OscComponent(juce::AudioProcessorValueTreeState& apvts, juce::String fmFreqId, juce::String fmDepthId)
+OscComponent::OscComponent(juce::AudioProcessorValueTreeState& apvts,
+                           juce::String fmFreqId, juce::String fmDepthId,
+                           juce::String unisonVoicesId, juce::String unisonDetuneId)
 {
-    setSliderWithLabel (fmFreqSlider,  fmFreqLabel,  apvts, fmFreqId,  fmFreqAttachment);
-    setSliderWithLabel (fmDepthSlider, fmDepthLabel, apvts, fmDepthId, fmDepthAttachment);
+    setSliderWithLabel (fmFreqSlider,       fmFreqLabel,       apvts, fmFreqId,       fmFreqAttachment);
+    setSliderWithLabel (fmDepthSlider,      fmDepthLabel,      apvts, fmDepthId,      fmDepthAttachment);
+    setSliderWithLabel (unisonVoicesSlider, unisonVoicesLabel, apvts, unisonVoicesId, unisonVoicesAttachment);
+    setSliderWithLabel (unisonDetuneSlider, unisonDetuneLabel, apvts, unisonDetuneId, unisonDetuneAttachment);
+    unisonVoicesSlider.setNumDecimalPlacesToDisplay (0);
 }
 
 OscComponent::~OscComponent()
@@ -31,21 +36,25 @@ void OscComponent::paint (juce::Graphics& g)
 
 void OscComponent::resized()
 {
-    const auto bounds       = getLocalBounds().reduced(8);
-    const auto labelHeight  = 14;
-    const auto labelY       = bounds.getY();
-    const auto sliderY      = labelY + labelHeight + 2;
-    const auto sliderHeight = bounds.getBottom() - sliderY;  // fills to same bottom gap as ADSR
-    const auto sliderWidth  = sliderHeight;                  // keep knobs square
-    const auto gap          = 14;
-    const auto totalWidth   = sliderWidth * 2 + gap;
-    const auto startX       = bounds.getX() + (bounds.getWidth() - totalWidth) / 2;
+    const auto bounds  = getLocalBounds().reduced(8);
+    const auto labelH  = 14;
 
-    fmFreqLabel.setBounds   (startX,                     labelY,  sliderWidth, labelHeight);
-    fmFreqSlider.setBounds  (startX,                     sliderY, sliderWidth, sliderHeight);
+    // Single horizontal row — label above, knob below, pinned to bounds
+    const auto labelY  = bounds.getY();
+    const auto knobY   = labelY + labelH + 2;
+    const auto knobH   = bounds.getBottom() - knobY;
+    const auto knobW   = knobH;
+    const auto gap     = (bounds.getWidth() - knobW * 4) / 3;
+    const auto startX  = bounds.getX() + (bounds.getWidth() - knobW * 4 - gap * 3) / 2;
 
-    fmDepthLabel.setBounds  (startX + sliderWidth + gap, labelY,  sliderWidth, labelHeight);
-    fmDepthSlider.setBounds (startX + sliderWidth + gap, sliderY, sliderWidth, sliderHeight);
+    fmFreqLabel .setBounds (startX,                      labelY, knobW, labelH);
+    fmFreqSlider.setBounds (startX,                      knobY,  knobW, knobH);
+    fmDepthLabel .setBounds(startX + (knobW + gap),      labelY, knobW, labelH);
+    fmDepthSlider.setBounds(startX + (knobW + gap),      knobY,  knobW, knobH);
+    unisonVoicesLabel .setBounds(startX + (knobW+gap)*2, labelY, knobW, labelH);
+    unisonVoicesSlider.setBounds(startX + (knobW+gap)*2, knobY,  knobW, knobH);
+    unisonDetuneLabel .setBounds(startX + (knobW+gap)*3, labelY, knobW, labelH);
+    unisonDetuneSlider.setBounds(startX + (knobW+gap)*3, knobY,  knobW, knobH);
 }
 
 using Attachment = juce::AudioProcessorValueTreeState::SliderAttachment;
@@ -53,7 +62,7 @@ using Attachment = juce::AudioProcessorValueTreeState::SliderAttachment;
 void OscComponent::setSliderWithLabel (juce::Slider& slider, juce::Label& label, juce::AudioProcessorValueTreeState& apvts, juce::String paramId, std::unique_ptr<Attachment>& attachment)
 {
     slider.setSliderStyle (juce::Slider::SliderStyle::RotaryHorizontalDrag);
-    slider.setTextBoxStyle (juce::Slider::TextBoxBelow, true, 45, 18);
+    slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 45, 18);
     slider.setColour (juce::Slider::thumbColourId,              juce::Colours::white);
     slider.setColour (juce::Slider::rotarySliderFillColourId,   juce::Colours::white);
     slider.setColour (juce::Slider::rotarySliderOutlineColourId, juce::Colours::black);

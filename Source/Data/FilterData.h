@@ -15,10 +15,11 @@
 class FilterData
 {
 public:
-    void prepareToPlay (juce::dsp::ProcessSpec& spec);
-    void updateParams  (float cutoff, float resonance, int filterType);
-    void process       (juce::dsp::AudioBlock<float>& audioBlock);
-    void reset();
+    void  prepareToPlay  (juce::dsp::ProcessSpec& spec);
+    void  updateParams   (float cutoff, float resonance, int filterType);
+    void  process        (juce::dsp::AudioBlock<float>& audioBlock);
+    float processSample  (int channel, float inputSample);
+    void  reset();
 
 private:
     juce::dsp::StateVariableTPTFilter<float> filter;

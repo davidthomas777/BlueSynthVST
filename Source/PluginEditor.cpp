@@ -12,16 +12,16 @@
 //==============================================================================
 BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProcessor& p)
     : AudioProcessorEditor (&p), audioProcessor (p),
-      osc (audioProcessor.apvts, "FMFREQ", "FMDEPTH"),
+      osc (audioProcessor.apvts, "FMFREQ", "FMDEPTH", "UNISONVOICES", "UNISONDETUNE"),
       adsr (audioProcessor.apvts, "ATTACK", "DECAY", "SUSTAIN", "RELEASE", "ENVELOPE"),
       filterComponent (audioProcessor.apvts, "FILTERTYPE", "FILTERCUTOFF", "FILTERRES", "FILTERENVAMT"),
       filterEnv (audioProcessor.apvts, "FILTERENVATTACK", "FILTERENVDECAY", "FILTERENVSUSTAIN", "FILTERENVRELEASE", "FILTER ENV")
 {
-    setSize (800, 700);
+    setSize (900, 800);
 
     // Gain knob
     gainSlider.setSliderStyle (juce::Slider::SliderStyle::RotaryHorizontalDrag);
-    gainSlider.setTextBoxStyle (juce::Slider::TextBoxBelow, true, 45, 18);
+    gainSlider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 45, 18);
     gainSlider.setColour (juce::Slider::thumbColourId,               juce::Colours::white);
     gainSlider.setColour (juce::Slider::rotarySliderFillColourId,    juce::Colours::white);
     gainSlider.setColour (juce::Slider::rotarySliderOutlineColourId, juce::Colours::black);
@@ -31,10 +31,44 @@ BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProc
     addAndMakeVisible (gainSlider);
 
     gainLabel.setText ("GAIN", juce::dontSendNotification);
-    gainLabel.setFont (juce::FontOptions (10.0f).withStyle ("Bold"));
+    gainLabel.setFont (juce::FontOptions (12.0f).withStyle ("Bold"));
     gainLabel.setColour (juce::Label::textColourId, juce::Colours::white);
     gainLabel.setJustificationType (juce::Justification::centred);
     addAndMakeVisible (gainLabel);
+
+    // Portamento knob
+    portamentoSlider.setSliderStyle (juce::Slider::SliderStyle::RotaryHorizontalDrag);
+    portamentoSlider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 45, 18);
+    portamentoSlider.setColour (juce::Slider::thumbColourId,               juce::Colours::white);
+    portamentoSlider.setColour (juce::Slider::rotarySliderFillColourId,    juce::Colours::white);
+    portamentoSlider.setColour (juce::Slider::rotarySliderOutlineColourId, juce::Colours::black);
+    portamentoSlider.setColour (juce::Slider::textBoxTextColourId,         juce::Colours::white);
+    portamentoSlider.setColour (juce::Slider::textBoxOutlineColourId,      juce::Colours::white);
+    portamentoAttachment = std::make_unique<SliderAttachment> (audioProcessor.apvts, "PORTAMENTO", portamentoSlider);
+    addAndMakeVisible (portamentoSlider);
+
+    portamentoLabel.setText ("GLIDE", juce::dontSendNotification);
+    portamentoLabel.setFont (juce::FontOptions (12.0f).withStyle ("Bold"));
+    portamentoLabel.setColour (juce::Label::textColourId, juce::Colours::white);
+    portamentoLabel.setJustificationType (juce::Justification::centred);
+    addAndMakeVisible (portamentoLabel);
+
+    // Pitch knob
+    pitchSlider.setSliderStyle (juce::Slider::SliderStyle::RotaryHorizontalDrag);
+    pitchSlider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 45, 18);
+    pitchSlider.setColour (juce::Slider::thumbColourId,               juce::Colours::white);
+    pitchSlider.setColour (juce::Slider::rotarySliderFillColourId,    juce::Colours::white);
+    pitchSlider.setColour (juce::Slider::rotarySliderOutlineColourId, juce::Colours::black);
+    pitchSlider.setColour (juce::Slider::textBoxTextColourId,         juce::Colours::white);
+    pitchSlider.setColour (juce::Slider::textBoxOutlineColourId,      juce::Colours::white);
+    pitchAttachment = std::make_unique<SliderAttachment> (audioProcessor.apvts, "PITCH", pitchSlider);
+    addAndMakeVisible (pitchSlider);
+
+    pitchLabel.setText ("PITCH", juce::dontSendNotification);
+    pitchLabel.setFont (juce::FontOptions (12.0f).withStyle ("Bold"));
+    pitchLabel.setColour (juce::Label::textColourId, juce::Colours::white);
+    pitchLabel.setJustificationType (juce::Justification::centred);
+    addAndMakeVisible (pitchLabel);
 
     juce::StringArray waveChoices { "Sine", "Saw", "Saw Inverse", "Square", "Triangle", "Pulse 1", "Pulse 2", "Noise" };
     oscWaveSelector.addItemList (waveChoices, 1);
@@ -60,9 +94,15 @@ void BlueSynthAudioProcessorEditor::paint (juce::Graphics& g)
     g.setFont (juce::FontOptions (20.0f).withStyle ("Bold"));
     g.drawText ("BLUESYNTH", 0, 4, getWidth(), 26, juce::Justification::centred);
 
-    // Gain box border
+    // Three knob boxes: Gain, Glide, Pitch (right to left from edge)
     g.setColour (juce::Colours::white);
-    g.drawRect (juce::Rectangle<int> (getWidth() - 110, 35, 90, 90), 2);
+    const int boxW = 90, boxH = 90, boxY = 35, gap = 4;
+    const int box1X = getWidth() - 10 - boxW;
+    const int box2X = box1X - gap - boxW;
+    const int box3X = box2X - gap - boxW;
+    g.drawRect (juce::Rectangle<int> (box3X, boxY, boxW, boxH), 2); // Gain
+    g.drawRect (juce::Rectangle<int> (box2X, boxY, boxW, boxH), 2); // Glide
+    g.drawRect (juce::Rectangle<int> (box1X, boxY, boxW, boxH), 2); // Pitch
 }
 
 void BlueSynthAudioProcessorEditor::resized()
@@ -70,15 +110,26 @@ void BlueSynthAudioProcessorEditor::resized()
     const auto panelWidth = 310;
     const auto panelX    = (getWidth() - panelWidth) / 2;
 
-    // Gain box: top right, 90x90 — inner is 74x74 after reduced(8)
-    const auto gainBox   = juce::Rectangle<int> (getWidth() - 110, 35, 90, 90);
-    const auto gainInner = gainBox.reduced (8);
-    gainLabel.setBounds  (gainInner.withHeight (11));
-    gainSlider.setBounds (gainInner.withTrimmedTop (13));
+    // Three knob boxes top-right: Gain, Glide, Pitch
+    const int boxW = 90, boxH = 90, boxY = 35, gap = 4;
+    const int box1X = getWidth() - 10 - boxW;           // Pitch (rightmost)
+    const int box2X = box1X - gap - boxW;               // Glide (middle)
+    const int box3X = box2X - gap - boxW;               // Gain (leftmost)
+
+    auto layoutKnob = [](juce::Rectangle<int> box, juce::Label& lbl, juce::Slider& sld)
+    {
+        auto inner = box.reduced (8);
+        lbl.setBounds (inner.withHeight (11));
+        sld.setBounds (inner.withTrimmedTop (13));
+    };
+
+    layoutKnob ({ box3X, boxY, boxW, boxH }, gainLabel,        gainSlider);
+    layoutKnob ({ box2X, boxY, boxW, boxH }, portamentoLabel,  portamentoSlider);
+    layoutKnob ({ box1X, boxY, boxW, boxH }, pitchLabel,       pitchSlider);
 
     oscWaveSelector.setBounds (panelX, 35,  panelWidth, 24);
     adsr.setBounds            (panelX, 63,  panelWidth, 180);
-    osc.setBounds             (panelX, 251, panelWidth, 110);
-    filterComponent.setBounds (panelX, 369, panelWidth, 156);
-    filterEnv.setBounds       (panelX, 533, panelWidth, 145);
+    filterComponent.setBounds (panelX, 251, panelWidth, 156);
+    filterEnv.setBounds       (panelX, 415, panelWidth, 145);
+    osc.setBounds             (panelX, 568, panelWidth, 100);
 }

@@ -36,6 +36,11 @@ void FilterData::process (juce::dsp::AudioBlock<float>& audioBlock)
     filter.process (juce::dsp::ProcessContextReplacing<float> (audioBlock));
 }
 
+float FilterData::processSample (int channel, float inputSample)
+{
+    return filter.processSample (channel, inputSample);
+}
+
 void FilterData::reset()
 {
     filter.reset();

@@ -10,14 +10,22 @@
 
 #include "SynthVoice.h"
 
+std::atomic<float> SynthVoice::lastPlayedHz { 0.0f };
+
 bool SynthVoice::canPlaySound (juce::SynthesiserSound* sound) {
     // ensure sound is loaded and not null
     return dynamic_cast<juce::SynthesiserSound*>(sound) != nullptr;
 }
 
 void SynthVoice::startNote (int midiNoteNumber, float velocity, juce::SynthesiserSound *sound, int currentPitchWheelPosition) {
-    // when start note plays, osc frequency is set to midiNoteNumber converted
-    osc.setWaveFrequency(midiNoteNumber);
+    targetHz = (float) juce::MidiMessage::getMidiNoteInHertz (midiNoteNumber);
+    float prev = lastPlayedHz.load();
+    if (portamentoTime > 0.001f && prev > 0.0f)
+        currentHz = prev;
+    else
+        currentHz = targetHz;
+    lastPlayedHz.store (targetHz);
+    updateOscFrequencies();
     adsr.noteOn();
     filterAdsr.noteOn();
 }
@@ -51,8 +59,11 @@ void SynthVoice::prepareToPlay(double sampleRate, int samplesPerBlock, int outpu
     spec.maximumBlockSize = samplesPerBlock;
     // set numChannels to current number of output channels
     spec.numChannels = outputChannels;
+    storedSampleRate = sampleRate;
 
-    osc.prepareToPlay (spec);
+    for (auto& o : unisonOscs)
+        o.prepareToPlay (spec);
+    unisonTempBuffer.setSize (outputChannels, samplesPerBlock);
     filter.prepareToPlay (spec);
     gain.prepare (spec);
     gain.setGainLinear(0.3f);
@@ -77,6 +88,40 @@ void SynthVoice::updateFilterEnv (float attack, float decay, float sustain, floa
     filterAdsr.updateADSR (attack, decay, sustain, release);
 }
 
+void SynthVoice::setOscWaveType (int choice)
+{
+    for (auto& o : unisonOscs)
+        o.setWaveType (choice);
+}
+
+void SynthVoice::setOscFmParams (float depth, float freq)
+{
+    for (auto& o : unisonOscs)
+        o.setFmParams (depth, freq);
+}
+
+void SynthVoice::updateUnison (int numVoices, float detune)
+{
+    numUnisonVoices = juce::jlimit (1, maxUnisonVoices, numVoices);
+    unisonDetune    = detune;
+}
+
+void SynthVoice::updatePortamento (float time)  { portamentoTime       = time; }
+void SynthVoice::updatePitch      (float semitones) { pitchOffsetSemitones = semitones; }
+
+void SynthVoice::updateOscFrequencies()
+{
+    float pitchedHz = currentHz * std::pow (2.0f, pitchOffsetSemitones / 12.0f);
+    for (int i = 0; i < numUnisonVoices; ++i)
+    {
+        float offset = 0.0f;
+        if (numUnisonVoices > 1)
+            offset = juce::jmap ((float)i, 0.0f, (float)(numUnisonVoices - 1),
+                                 -unisonDetune * 0.5f, unisonDetune * 0.5f);
+        unisonOscs[i].setWaveFrequencyHz (pitchedHz, offset);
+    }
+}
+
 void SynthVoice::renderNextBlock (juce::AudioBuffer< float > &outputBuffer, int startSample, int numSamples) {
     jassert(isPrepared);
 
@@ -90,20 +135,49 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer< float > &outputBuffer, int 
     // create an audioblock wrapper around an existing audio buffer (for DSP operation)
     juce::dsp::AudioBlock<float> audioBlock { synthBuffer };
 
-    // 1. Oscillator
-    osc.getNextAudioBlock(audioBlock);
+    // 0. Portamento — smooth currentHz toward targetHz per block
+    if (portamentoTime > 0.001f)
+    {
+        float coeff = std::exp (-(float)numSamples / (portamentoTime * (float)storedSampleRate));
+        currentHz   = targetHz + (currentHz - targetHz) * coeff;
+    }
+    else
+    {
+        currentHz = targetHz;
+    }
+    updateOscFrequencies();
+
+    // 1. Oscillator (unison)
+    unisonOscs[0].getNextAudioBlock (audioBlock);
+
+    for (int i = 1; i < numUnisonVoices; ++i)
+    {
+        unisonTempBuffer.setSize (synthBuffer.getNumChannels(),
+                                  synthBuffer.getNumSamples(), false, false, true);
+        unisonTempBuffer.clear();
+        auto tempBlock = juce::dsp::AudioBlock<float> (unisonTempBuffer);
+        unisonOscs[i].getNextAudioBlock (tempBlock);
+        for (int ch = 0; ch < synthBuffer.getNumChannels(); ++ch)
+            synthBuffer.addFrom (ch, 0, unisonTempBuffer, ch, 0, synthBuffer.getNumSamples());
+    }
+
+    if (numUnisonVoices > 1)
+        synthBuffer.applyGain (1.0f / std::sqrt ((float)numUnisonVoices));
 
     // 2. Gain
     gain.process(juce::dsp::ProcessContextReplacing<float> (audioBlock));
 
-    // 3. Compute modulated cutoff from filter envelope
-    float envValue = filterAdsr.getNextSample();
-    float modulatedCutoff = filterCutoff + (envValue * filterEnvAmt * 20000.0f);
-    modulatedCutoff = juce::jlimit (20.0f, 20000.0f, modulatedCutoff);
+    // 3+4. Per-sample filter envelope modulation + filtering
+    for (int s = 0; s < synthBuffer.getNumSamples(); ++s)
+    {
+        float envValue       = filterAdsr.getNextSample();
+        float modulatedCutoff = juce::jlimit (20.0f, 20000.0f,
+                                    filterCutoff + envValue * filterEnvAmt * 20000.0f);
+        filter.updateParams (modulatedCutoff, filterRes, filterType);
 
-    // 4. Apply filter
-    filter.updateParams (modulatedCutoff, filterRes, filterType);
-    filter.process (audioBlock);
+        for (int ch = 0; ch < synthBuffer.getNumChannels(); ++ch)
+            synthBuffer.setSample (ch, s, filter.processSample (ch, synthBuffer.getSample (ch, s)));
+    }
 
     // 5. Amplitude ADSR
     adsr.applyEnvelopeToBuffer(synthBuffer, 0, synthBuffer.getNumSamples());

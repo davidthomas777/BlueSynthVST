@@ -37,6 +37,10 @@ private:
 
     juce::Slider gainSlider;
     juce::Label  gainLabel;
+    juce::Slider portamentoSlider;
+    juce::Label  portamentoLabel;
+    juce::Slider pitchSlider;
+    juce::Label  pitchLabel;
 
     juce::ComboBox oscWaveSelector;
 
@@ -44,6 +48,8 @@ private:
     using ComboBoxAttachment = juce::AudioProcessorValueTreeState::ComboBoxAttachment;
 
     std::unique_ptr<SliderAttachment>   gainAttachment;
+    std::unique_ptr<SliderAttachment>   portamentoAttachment;
+    std::unique_ptr<SliderAttachment>   pitchAttachment;
     std::unique_ptr<ComboBoxAttachment> waveSelectorAttachment;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (BlueSynthAudioProcessorEditor)

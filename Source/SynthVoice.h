@@ -28,15 +28,24 @@ public:
     void update (const float attack, const float decay, const float sustain, const float release);
     void updateFilter (float cutoff, float resonance, float envAmt, int type);
     void updateFilterEnv (float attack, float decay, float sustain, float release);
-
-    OscData& getOscillator() { return osc; };
+    void setOscWaveType    (int choice);
+    void setOscFmParams    (float depth, float freq);
+    void updateUnison      (int numVoices, float detune);
+    void updatePortamento  (float time);
+    void updatePitch       (float semitones);
 
 private:
+    static constexpr int maxUnisonVoices = 8;
+
     AdsrData adsr;
     AdsrData filterAdsr;
     juce::AudioBuffer<float> synthBuffer;
+    juce::AudioBuffer<float> unisonTempBuffer;
 
-    OscData    osc;
+    std::array<OscData, maxUnisonVoices> unisonOscs;
+    int   numUnisonVoices { 1 };
+    float unisonDetune    { 0.0f };
+
     FilterData filter;
 
     // juce::dsp::Oscillator<float> osc { [](float x) { return x < 0.0f ? -1.0f : 1.0f; }, 200};
@@ -46,6 +55,16 @@ private:
     float filterCutoff  { 20000.0f };
     float filterRes     { 0.1f };
     int   filterType    { 0 };
+
+    float currentHz         { 0.0f };
+    float targetHz          { 0.0f };
+    float portamentoTime    { 0.0f };
+    float pitchOffsetSemitones { 0.0f };
+    double storedSampleRate { 44100.0 };
+
+    void updateOscFrequencies();
+
+    static std::atomic<float> lastPlayedHz;
 
     bool isPrepared { false };
 };

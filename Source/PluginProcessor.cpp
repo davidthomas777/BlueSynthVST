@@ -183,8 +183,16 @@ void BlueSynthAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
             auto& fEnvSus = *apvts.getRawParameterValue("FILTERENVSUSTAIN");
             auto& fEnvRel = *apvts.getRawParameterValue("FILTERENVRELEASE");
 
-            voice->getOscillator().setWaveType (oscWaveChoice);
-            voice->getOscillator().setFmParams (fmDepth, fmFreq);
+            auto& unisonVoices = *apvts.getRawParameterValue("UNISONVOICES");
+            auto& unisonDetune = *apvts.getRawParameterValue("UNISONDETUNE");
+            auto& portamento   = *apvts.getRawParameterValue("PORTAMENTO");
+            auto& pitch        = *apvts.getRawParameterValue("PITCH");
+
+            voice->setOscWaveType   (static_cast<int>(oscWaveChoice.load()));
+            voice->setOscFmParams   (fmDepth, fmFreq);
+            voice->updateUnison     (static_cast<int>(unisonVoices.load()), unisonDetune.load());
+            voice->updatePortamento (portamento.load());
+            voice->updatePitch      (pitch.load());
             voice->update (attack.load(), decay.load(), sustain.load(), release.load());
 
             voice->updateFilter (filterCutoff.load(), filterRes.load(), filterEnvAmt.load(), static_cast<int>(filterType.load()));
@@ -265,6 +273,17 @@ juce::AudioProcessorValueTreeState::ParameterLayout BlueSynthAudioProcessor::cre
     params.push_back (std::make_unique<juce::AudioParameterFloat>("FILTERENVDECAY",   "Filter Env Decay",   juce::NormalisableRange<float> {0.0f, 1.0f, 0.01f}, 0.1f));
     params.push_back (std::make_unique<juce::AudioParameterFloat>("FILTERENVSUSTAIN", "Filter Env Sustain", juce::NormalisableRange<float> {0.0f, 1.0f, 0.01f}, 1.0f));
     params.push_back (std::make_unique<juce::AudioParameterFloat>("FILTERENVRELEASE", "Filter Env Release", juce::NormalisableRange<float> {0.0f, 3.0f, 0.01f}, 0.4f));
+
+    // Unison
+    params.push_back (std::make_unique<juce::AudioParameterInt>  ("UNISONVOICES", "Unison Voices", 1, 8, 1));
+    params.push_back (std::make_unique<juce::AudioParameterFloat>("UNISONDETUNE", "Unison Detune",
+        juce::NormalisableRange<float> {0.0f, 1.0f, 0.01f}, 0.0f));
+
+    // Portamento & Pitch
+    params.push_back (std::make_unique<juce::AudioParameterFloat>("PORTAMENTO", "Portamento",
+        juce::NormalisableRange<float> {0.0f, 2.0f, 0.001f, 0.3f}, 0.0f));
+    params.push_back (std::make_unique<juce::AudioParameterFloat>("PITCH", "Pitch",
+        juce::NormalisableRange<float> {-24.0f, 24.0f, 0.01f}, 0.0f));
 
     return { params.begin(), params.end() };
 }
