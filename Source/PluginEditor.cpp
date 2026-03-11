@@ -9,6 +9,18 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
+juce::PopupMenu::Options BlueSynthAudioProcessorEditor::DownwardComboLookAndFeel::getOptionsForComboBoxPopupMenu (
+    juce::ComboBox& box, juce::Label& label)
+{
+    return juce::PopupMenu::Options()
+        .withTargetComponent (&box)
+        .withInitiallySelectedItem (box.getSelectedId())
+        .withPreferredPopupDirection (juce::PopupMenu::Options::PopupDirection::downwards)
+        .withMinimumWidth (box.getWidth())
+        .withMaximumNumColumns (1)
+        .withStandardItemHeight (label.getHeight());
+}
+
 //==============================================================================
 BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProcessor& p)
     : AudioProcessorEditor (&p), audioProcessor (p),
@@ -18,6 +30,7 @@ BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProc
       filterComponent (audioProcessor.apvts, "FILTERTYPE", "FILTERCUTOFF", "FILTERRES", "FILTERENVAMT"),
       filterEnv (audioProcessor.apvts, "FILTERENVATTACK", "FILTERENVDECAY", "FILTERENVSUSTAIN", "FILTERENVRELEASE", "FILTER ENV")
 {
+    setLookAndFeel (&editorLookAndFeel);
     setSize (900, 800);
 
     // Gain knob
@@ -85,6 +98,7 @@ BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProc
 
 BlueSynthAudioProcessorEditor::~BlueSynthAudioProcessorEditor()
 {
+    setLookAndFeel (nullptr);
 }
 
 //==============================================================================

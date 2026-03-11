@@ -42,18 +42,47 @@ void PresetComponent::PresetBoxLookAndFeel::drawButtonBackground (
     g.drawRect (button.getLocalBounds(), 1);
 }
 
-// Draw placeholder at full opacity — JUCE's default hardcodes 0.5f alpha
-void PresetComponent::PresetBoxLookAndFeel::drawComboBoxTextWhenNothingSelected (
-    juce::Graphics& g, juce::ComboBox& box, juce::Label& label)
+// Always centre button text both horizontally and vertically
+void PresetComponent::PresetBoxLookAndFeel::drawButtonText (
+    juce::Graphics& g, juce::TextButton& button, bool, bool)
 {
-    g.setColour (box.findColour (juce::ComboBox::textColourId));  // no alpha reduction
-    auto font = label.getLookAndFeel().getLabelFont (label);
-    g.setFont (font);
-    auto textArea = getLabelBorderSize (label).subtractedFrom (label.getLocalBounds());
-    g.drawFittedText (box.getTextWhenNothingSelected(), textArea,
-                      label.getJustificationType(),
-                      juce::jmax (1, (int) ((float) textArea.getHeight() / font.getHeight())),
-                      label.getMinimumHorizontalScale());
+    g.setColour (button.findColour (button.getToggleState() ? juce::TextButton::textColourOnId
+                                                            : juce::TextButton::textColourOffId)
+                     .withMultipliedAlpha (button.isEnabled() ? 1.0f : 0.5f));
+    g.setFont (getTextButtonFont (button, button.getHeight()));
+    g.drawFittedText (button.getButtonText(), button.getLocalBounds(),
+                      juce::Justification::centred, 1);
+}
+
+void PresetComponent::PresetBoxLookAndFeel::positionComboBoxText (juce::ComboBox& box, juce::Label& label)
+{
+    label.setBounds (1, 1, box.getWidth() - 30, box.getHeight() - 2);
+    label.setFont (getComboBoxFont (box));
+    label.setJustificationType (juce::Justification::centred);
+}
+
+juce::PopupMenu::Options PresetComponent::PresetBoxLookAndFeel::getOptionsForComboBoxPopupMenu (
+    juce::ComboBox& box, juce::Label& label)
+{
+    return juce::PopupMenu::Options()
+        .withTargetComponent (&box)
+        .withInitiallySelectedItem (box.getSelectedId())
+        .withPreferredPopupDirection (juce::PopupMenu::Options::PopupDirection::downwards)
+        .withMinimumWidth (box.getWidth())
+        .withMaximumNumColumns (1)
+        .withStandardItemHeight (label.getHeight());
+}
+
+// Draw placeholder at full opacity with same font/area as selected item text
+void PresetComponent::PresetBoxLookAndFeel::drawComboBoxTextWhenNothingSelected (
+    juce::Graphics& g, juce::ComboBox& box, juce::Label&)
+{
+    g.setColour (box.findColour (juce::ComboBox::textColourId));
+    g.setFont (getComboBoxFont (box));
+    // Use the exact same bounds as positionComboBoxText so sizes match
+    g.drawFittedText (box.getTextWhenNothingSelected(),
+                      { 1, 1, box.getWidth() - 30, box.getHeight() - 2 },
+                      juce::Justification::centred, 1);
 }
 
 PresetComponent::PresetComponent (juce::AudioProcessorValueTreeState& a, PresetManager& pm)
@@ -87,6 +116,15 @@ PresetComponent::PresetComponent (juce::AudioProcessorValueTreeState& a, PresetM
     presetBox.setColour (juce::ComboBox::outlineColourId,    juce::Colours::white);
     presetBox.setColour (juce::ComboBox::arrowColourId,      juce::Colours::white);
     refreshPresetList();
+
+    // Restore previously selected preset (survives editor close/reopen)
+    auto currentName = presetManager.getCurrentPresetName();
+    if (currentName.isNotEmpty())
+    {
+        auto idx = presetManager.getAllPresetNames().indexOf (currentName);
+        if (idx >= 0)
+            presetBox.setSelectedId (idx + 1, juce::dontSendNotification);
+    }
 
     // Prev: cycle backwards with wraparound
     prevButton.onClick = [this]()

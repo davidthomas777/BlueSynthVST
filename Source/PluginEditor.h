@@ -29,6 +29,14 @@ public:
     void resized() override;
 
 private:
+    // Forces all ComboBox popups to always open downward
+    struct DownwardComboLookAndFeel : public juce::LookAndFeel_V4
+    {
+        juce::PopupMenu::Options getOptionsForComboBoxPopupMenu (juce::ComboBox&, juce::Label&) override;
+    };
+
+    DownwardComboLookAndFeel editorLookAndFeel;
+
     // This is a reference to our audioProcessor
     BlueSynthAudioProcessor& audioProcessor;
     PresetComponent   presetComponent;

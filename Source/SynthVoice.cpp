@@ -147,22 +147,51 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer< float > &outputBuffer, int 
     }
     updateOscFrequencies();
 
-    // 1. Oscillator (unison)
+    // 1. Oscillator (unison) with stereo spread
+    const int N    = numUnisonVoices;
+    const bool stereo = synthBuffer.getNumChannels() >= 2;
+
+    // Equal-power pan gains for voice i spread evenly across the stereo field
+    auto panGains = [N] (int i, float& lGain, float& rGain)
+    {
+        float pan   = juce::jmap ((float)i, 0.0f, (float)(N - 1), -1.0f, 1.0f);
+        float angle = (pan + 1.0f) * juce::MathConstants<float>::halfPi * 0.5f;
+        lGain = std::cos (angle);
+        rGain = std::sin (angle);
+    };
+
     unisonOscs[0].getNextAudioBlock (audioBlock);
 
-    for (int i = 1; i < numUnisonVoices; ++i)
+    if (N > 1 && stereo)
+    {
+        float lGain, rGain;
+        panGains (0, lGain, rGain);
+        synthBuffer.applyGain (0, 0, synthBuffer.getNumSamples(), lGain);
+        synthBuffer.applyGain (1, 0, synthBuffer.getNumSamples(), rGain);
+    }
+
+    for (int i = 1; i < N; ++i)
     {
         unisonTempBuffer.setSize (synthBuffer.getNumChannels(),
                                   synthBuffer.getNumSamples(), false, false, true);
         unisonTempBuffer.clear();
         auto tempBlock = juce::dsp::AudioBlock<float> (unisonTempBuffer);
         unisonOscs[i].getNextAudioBlock (tempBlock);
+
+        if (stereo)
+        {
+            float lGain, rGain;
+            panGains (i, lGain, rGain);
+            unisonTempBuffer.applyGain (0, 0, unisonTempBuffer.getNumSamples(), lGain);
+            unisonTempBuffer.applyGain (1, 0, unisonTempBuffer.getNumSamples(), rGain);
+        }
+
         for (int ch = 0; ch < synthBuffer.getNumChannels(); ++ch)
             synthBuffer.addFrom (ch, 0, unisonTempBuffer, ch, 0, synthBuffer.getNumSamples());
     }
 
-    if (numUnisonVoices > 1)
-        synthBuffer.applyGain (1.0f / std::sqrt ((float)numUnisonVoices));
+    if (N > 1)
+        synthBuffer.applyGain (1.0f / std::sqrt ((float)N));
 
     // 2. Gain
     gain.process(juce::dsp::ProcessContextReplacing<float> (audioBlock));
