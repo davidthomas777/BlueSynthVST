@@ -9,6 +9,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include "Data/PresetManager.h"
 
 //==============================================================================
 /**
@@ -55,6 +56,7 @@ public:
     
     // Creates a state object for a given processor, and sets up the parameters that control that processor
     juce::AudioProcessorValueTreeState apvts;
+    PresetManager presetManager;
 
 private:
     juce::Synthesiser synth;

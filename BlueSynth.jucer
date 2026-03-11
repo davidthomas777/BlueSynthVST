@@ -22,6 +22,8 @@
       <FILE id="T94f10" name="OscData.h" compile="0" resource="0" file="Source/Data/OscData.h"/>
       <FILE id="Fd3r1A" name="FilterData.cpp" compile="1" resource="0" file="Source/Data/FilterData.cpp"/>
       <FILE id="Gx7mBc" name="FilterData.h" compile="0" resource="0" file="Source/Data/FilterData.h"/>
+      <FILE id="PrMg1h" name="PresetManager.cpp" compile="1" resource="0" file="Source/Data/PresetManager.cpp"/>
+      <FILE id="PrMg2h" name="PresetManager.h" compile="0" resource="0" file="Source/Data/PresetManager.h"/>
     </GROUP>
     <GROUP id="{62270905-B2F4-6EEB-C633-ED3DC0854DFD}" name="UI">
       <FILE id="KES7NP" name="ADSRComponent.cpp" compile="1" resource="0"
@@ -33,6 +35,8 @@
       <FILE id="Hk9pQz" name="FilterComponent.cpp" compile="1" resource="0"
             file="Source/UI/FilterComponent.cpp"/>
       <FILE id="Jm2vRx" name="FilterComponent.h" compile="0" resource="0" file="Source/UI/FilterComponent.h"/>
+      <FILE id="PrCp1h" name="PresetComponent.cpp" compile="1" resource="0" file="Source/UI/PresetComponent.cpp"/>
+      <FILE id="PrCp2h" name="PresetComponent.h" compile="0" resource="0" file="Source/UI/PresetComponent.h"/>
     </GROUP>
   </MAINGROUP>
   <MODULES>

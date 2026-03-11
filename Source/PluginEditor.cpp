@@ -12,6 +12,7 @@
 //==============================================================================
 BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProcessor& p)
     : AudioProcessorEditor (&p), audioProcessor (p),
+      presetComponent (audioProcessor.apvts, audioProcessor.presetManager),
       osc (audioProcessor.apvts, "FMFREQ", "FMDEPTH", "UNISONVOICES", "UNISONDETUNE"),
       adsr (audioProcessor.apvts, "ATTACK", "DECAY", "SUSTAIN", "RELEASE", "ENVELOPE"),
       filterComponent (audioProcessor.apvts, "FILTERTYPE", "FILTERCUTOFF", "FILTERRES", "FILTERENVAMT"),
@@ -75,6 +76,7 @@ BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProc
     addAndMakeVisible (oscWaveSelector);
     waveSelectorAttachment = std::make_unique<ComboBoxAttachment> (audioProcessor.apvts, "OSC1WAVETYPE", oscWaveSelector);
 
+    addAndMakeVisible (presetComponent);
     addAndMakeVisible (osc);
     addAndMakeVisible (adsr);
     addAndMakeVisible (filterComponent);
@@ -127,9 +129,10 @@ void BlueSynthAudioProcessorEditor::resized()
     layoutKnob ({ box2X, boxY, boxW, boxH }, portamentoLabel,  portamentoSlider);
     layoutKnob ({ box1X, boxY, boxW, boxH }, pitchLabel,       pitchSlider);
 
-    oscWaveSelector.setBounds (panelX, 35,  panelWidth, 24);
-    adsr.setBounds            (panelX, 63,  panelWidth, 180);
-    filterComponent.setBounds (panelX, 251, panelWidth, 156);
-    filterEnv.setBounds       (panelX, 415, panelWidth, 145);
-    osc.setBounds             (panelX, 568, panelWidth, 100);
+    presetComponent.setBounds (panelX, 35,  panelWidth, 24);
+    oscWaveSelector.setBounds (panelX, 67,  panelWidth, 24);
+    adsr.setBounds            (panelX, 95,  panelWidth, 180);
+    filterComponent.setBounds (panelX, 283, panelWidth, 156);
+    filterEnv.setBounds       (panelX, 447, panelWidth, 145);
+    osc.setBounds             (panelX, 600, panelWidth, 100);
 }

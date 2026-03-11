@@ -13,6 +13,7 @@
 #include "UI/ADSRComponent.h"
 #include "UI/OscComponent.h"
 #include "UI/FilterComponent.h"
+#include "UI/PresetComponent.h"
 
 //==============================================================================
 /**
@@ -30,6 +31,7 @@ public:
 private:
     // This is a reference to our audioProcessor
     BlueSynthAudioProcessor& audioProcessor;
+    PresetComponent   presetComponent;
     OscComponent      osc;
     ADSRComponent     adsr;
     FilterComponent   filterComponent;
