@@ -29,7 +29,12 @@ bool PresetManager::savePreset (juce::AudioProcessorValueTreeState& apvts, const
         return false;
 
     auto file = getPresetDirectory().getChildFile (name + presetFileExtension);
-    return xml->writeTo (file);
+    if (xml->writeTo (file))
+    {
+        currentPresetName = name;
+        return true;
+    }
+    return false;
 }
 
 bool PresetManager::loadPreset (juce::AudioProcessorValueTreeState& apvts, const juce::String& name)
@@ -47,6 +52,7 @@ bool PresetManager::loadPreset (juce::AudioProcessorValueTreeState& apvts, const
         return false;
 
     apvts.replaceState (state);
+    currentPresetName = name;
     return true;
 }
 
@@ -56,7 +62,13 @@ bool PresetManager::deletePreset (const juce::String& name)
     if (! file.existsAsFile())
         return false;
 
-    return file.deleteFile();
+    if (file.deleteFile())
+    {
+        if (currentPresetName == name)
+            currentPresetName = {};
+        return true;
+    }
+    return false;
 }
 
 juce::StringArray PresetManager::getAllPresetNames() const

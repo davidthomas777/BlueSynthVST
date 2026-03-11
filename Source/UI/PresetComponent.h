@@ -24,6 +24,9 @@ private:
         void drawComboBox (juce::Graphics&, int width, int height, bool, int, int, int, int, juce::ComboBox&) override;
         void drawButtonBackground (juce::Graphics&, juce::Button&, const juce::Colour& backgroundColour,
                                    bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown) override;
+        void drawButtonText       (juce::Graphics&, juce::TextButton&, bool isMouseOver, bool isDown) override;
+        void positionComboBoxText (juce::ComboBox&, juce::Label&) override;
+        juce::PopupMenu::Options getOptionsForComboBoxPopupMenu (juce::ComboBox&, juce::Label&) override;
     };
 
     juce::AudioProcessorValueTreeState& apvts;
