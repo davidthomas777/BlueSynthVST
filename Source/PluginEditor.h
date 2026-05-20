@@ -33,6 +33,7 @@ private:
     struct DownwardComboLookAndFeel : public juce::LookAndFeel_V4
     {
         juce::PopupMenu::Options getOptionsForComboBoxPopupMenu (juce::ComboBox&, juce::Label&) override;
+        void drawComboBox (juce::Graphics&, int width, int height, bool, int, int, int, int, juce::ComboBox&) override;
     };
 
     DownwardComboLookAndFeel editorLookAndFeel;

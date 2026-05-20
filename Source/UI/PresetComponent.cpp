@@ -230,11 +230,11 @@ void PresetComponent::resized()
 
     // Fixed widths for each button
     const int prevW = 28, nextW = 28, saveW = 50, delW = 55;
-    // ComboBox gets remaining width; +4 accounts for the 4 overlaps between 5 elements
+    // ComboBox gets remaining width; +4 accounts for the 4 x 1px overlaps between 5 elements
     const int boxW  = W - prevW - nextW - saveW - delW + 4;
 
-    // Each element starts 1px before the previous one ended so borders overlap
-    // rather than doubling up to 2px at internal junctions
+    // Each element starts 1px before the previous one ended so 1px borders overlap
+    // exactly, keeping all internal junctions at 1px (same as other component boxes)
     int x = 0;
     prevButton  .setBounds (x, 0, prevW, h);  x += prevW - 1;
     presetBox   .setBounds (x, 0, boxW,  h);  x += boxW  - 1;
