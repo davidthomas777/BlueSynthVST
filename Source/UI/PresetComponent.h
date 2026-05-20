@@ -31,7 +31,6 @@ private:
 
     juce::AudioProcessorValueTreeState& apvts;
     PresetManager&                      presetManager;
-
     PresetBoxLookAndFeel presetLookAndFeel;
 
     juce::TextButton prevButton   { "<" };

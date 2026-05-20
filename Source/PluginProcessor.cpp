@@ -270,9 +270,34 @@ juce::AudioProcessorValueTreeState::ParameterLayout BlueSynthAudioProcessor::cre
 
     // Filter
     params.push_back (std::make_unique<juce::AudioParameterChoice>("FILTERTYPE", "Filter Type", juce::StringArray {"Low Pass", "High Pass", "Band Pass"}, 0));
-    params.push_back (std::make_unique<juce::AudioParameterFloat>("FILTERCUTOFF", "Filter Cutoff", juce::NormalisableRange<float> {20.0f, 20000.0f, 0.1f, 0.3f}, 20000.0f));
+    params.push_back (std::make_unique<juce::AudioParameterFloat>(
+        "FILTERCUTOFF", "Filter Cutoff",
+        juce::NormalisableRange<float> {20.0f, 20000.0f, 0.1f, 0.3f},
+        20000.0f,
+        juce::String(),
+        juce::AudioProcessorParameter::genericParameter,
+        [] (float v, int) -> juce::String
+        {
+            if (v >= 1000.0f)
+                return juce::String (v / 1000.0f, 1) + "k";
+            return juce::String ((int) v) + "Hz";
+        },
+        [] (const juce::String& t) -> float
+        {
+            if (t.endsWithIgnoreCase ("k"))
+                return t.dropLastCharacters (1).getFloatValue() * 1000.0f;
+            return t.getFloatValue();
+        }));
     params.push_back (std::make_unique<juce::AudioParameterFloat>("FILTERRES",    "Filter Resonance", juce::NormalisableRange<float> {0.0f, 1.0f, 0.01f}, 0.1f));
-    params.push_back (std::make_unique<juce::AudioParameterFloat>("FILTERENVAMT", "Filter Env Amount", juce::NormalisableRange<float> {-1.0f, 1.0f, 0.01f}, 0.0f));
+    {
+        juce::NormalisableRange<float> envAmtRange (
+            -1.0f, 1.0f,
+            [] (float s, float e, float v) { return s + v * (e - s); },
+            [] (float s, float e, float v) { return (v - s) / (e - s); },
+            [] (float, float, float v) -> float { return std::abs (v) < 0.05f ? 0.0f : v; });
+        envAmtRange.interval = 0.01f;
+        params.push_back (std::make_unique<juce::AudioParameterFloat>("FILTERENVAMT", "Filter Env Amount", envAmtRange, 0.0f));
+    }
 
     // Filter envelope ADSR
     params.push_back (std::make_unique<juce::AudioParameterFloat>("FILTERENVATTACK",  "Filter Env Attack",  juce::NormalisableRange<float> {0.0f, 1.0f, 0.01f}, 0.1f));
@@ -288,8 +313,15 @@ juce::AudioProcessorValueTreeState::ParameterLayout BlueSynthAudioProcessor::cre
     // Portamento & Pitch
     params.push_back (std::make_unique<juce::AudioParameterFloat>("PORTAMENTO", "Portamento",
         juce::NormalisableRange<float> {0.0f, 2.0f, 0.001f, 0.3f}, 0.0f));
-    params.push_back (std::make_unique<juce::AudioParameterFloat>("PITCH", "Pitch",
-        juce::NormalisableRange<float> {-24.0f, 24.0f, 0.01f}, 0.0f));
+    {
+        juce::NormalisableRange<float> pitchRange (
+            -24.0f, 24.0f,
+            [] (float s, float e, float v) { return s + v * (e - s); },
+            [] (float s, float e, float v) { return (v - s) / (e - s); },
+            [] (float, float, float v) -> float { return std::abs (v) < 0.5f ? 0.0f : v; });
+        pitchRange.interval = 0.01f;
+        params.push_back (std::make_unique<juce::AudioParameterFloat>("PITCH", "Pitch", pitchRange, 0.0f));
+    }
 
     return { params.begin(), params.end() };
 }

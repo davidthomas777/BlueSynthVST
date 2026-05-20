@@ -9,6 +9,27 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
+void BlueSynthAudioProcessorEditor::DownwardComboLookAndFeel::drawComboBox (
+    juce::Graphics& g, int width, int height, bool, int, int, int, int, juce::ComboBox& box)
+{
+    juce::Rectangle<int> bounds (0, 0, width, height);
+
+    g.setColour (box.findColour (juce::ComboBox::backgroundColourId));
+    g.fillRect (bounds);
+
+    g.setColour (box.findColour (juce::ComboBox::outlineColourId));
+    g.drawRect (bounds, 1);
+
+    juce::Rectangle<int> arrowZone (width - 30, 0, 20, height);
+    juce::Path path;
+    path.startNewSubPath ((float) arrowZone.getX() + 3.0f,      (float) arrowZone.getCentreY() - 2.0f);
+    path.lineTo           ((float) arrowZone.getCentreX(),       (float) arrowZone.getCentreY() + 3.0f);
+    path.lineTo           ((float) arrowZone.getRight() - 3.0f,  (float) arrowZone.getCentreY() - 2.0f);
+
+    g.setColour (box.findColour (juce::ComboBox::arrowColourId).withAlpha (box.isEnabled() ? 0.9f : 0.2f));
+    g.strokePath (path, juce::PathStrokeType (2.0f));
+}
+
 juce::PopupMenu::Options BlueSynthAudioProcessorEditor::DownwardComboLookAndFeel::getOptionsForComboBoxPopupMenu (
     juce::ComboBox& box, juce::Label& label)
 {
@@ -86,6 +107,10 @@ BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProc
 
     juce::StringArray waveChoices { "Sine", "Saw", "Saw Inverse", "Square", "Triangle", "Pulse 1", "Pulse 2", "Noise" };
     oscWaveSelector.addItemList (waveChoices, 1);
+    oscWaveSelector.setColour (juce::ComboBox::backgroundColourId, juce::Colour (0xff4A90E2));
+    oscWaveSelector.setColour (juce::ComboBox::textColourId,       juce::Colours::white);
+    oscWaveSelector.setColour (juce::ComboBox::outlineColourId,    juce::Colours::white);
+    oscWaveSelector.setColour (juce::ComboBox::arrowColourId,      juce::Colours::white);
     addAndMakeVisible (oscWaveSelector);
     waveSelectorAttachment = std::make_unique<ComboBoxAttachment> (audioProcessor.apvts, "OSC1WAVETYPE", oscWaveSelector);
 
@@ -116,9 +141,9 @@ void BlueSynthAudioProcessorEditor::paint (juce::Graphics& g)
     const int box1X = getWidth() - 10 - boxW;
     const int box2X = box1X - gap - boxW;
     const int box3X = box2X - gap - boxW;
-    g.drawRect (juce::Rectangle<int> (box3X, boxY, boxW, boxH), 2); // Gain
-    g.drawRect (juce::Rectangle<int> (box2X, boxY, boxW, boxH), 2); // Glide
-    g.drawRect (juce::Rectangle<int> (box1X, boxY, boxW, boxH), 2); // Pitch
+    g.drawRect (juce::Rectangle<int> (box3X, boxY, boxW, boxH), 1); // Gain
+    g.drawRect (juce::Rectangle<int> (box2X, boxY, boxW, boxH), 1); // Glide
+    g.drawRect (juce::Rectangle<int> (box1X, boxY, boxW, boxH), 1); // Pitch
 }
 
 void BlueSynthAudioProcessorEditor::resized()
@@ -144,7 +169,7 @@ void BlueSynthAudioProcessorEditor::resized()
     layoutKnob ({ box1X, boxY, boxW, boxH }, pitchLabel,       pitchSlider);
 
     presetComponent.setBounds (panelX, 35,  panelWidth, 24);
-    oscWaveSelector.setBounds (panelX, 67,  panelWidth, 24);
+    oscWaveSelector.setBounds (panelX, 65,  panelWidth, 24);
     adsr.setBounds            (panelX, 95,  panelWidth, 180);
     filterComponent.setBounds (panelX, 283, panelWidth, 156);
     filterEnv.setBounds       (panelX, 447, panelWidth, 145);

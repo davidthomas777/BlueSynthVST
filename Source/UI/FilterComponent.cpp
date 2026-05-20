@@ -19,26 +19,16 @@ FilterComponent::FilterComponent (juce::AudioProcessorValueTreeState& apvts,
                                    juce::String envAmtId)
 {
     filterTypeSelector.addItemList ({ "Low Pass", "High Pass", "Band Pass" }, 1);
+    filterTypeSelector.setColour (juce::ComboBox::backgroundColourId, juce::Colour (0xff4A90E2));
+    filterTypeSelector.setColour (juce::ComboBox::textColourId,       juce::Colours::white);
+    filterTypeSelector.setColour (juce::ComboBox::outlineColourId,    juce::Colours::white);
+    filterTypeSelector.setColour (juce::ComboBox::arrowColourId,      juce::Colours::white);
     filterTypeAttachment = std::make_unique<ComboBoxAttachment> (apvts, filterTypeId, filterTypeSelector);
     addAndMakeVisible (filterTypeSelector);
 
     setSliderWithLabel (cutoffSlider,    cutoffLabel,    apvts, cutoffId,    cutoffAttachment);
     setSliderWithLabel (resonanceSlider, resonanceLabel, apvts, resonanceId, resonanceAttachment);
     setSliderWithLabel (envAmtSlider,    envAmtLabel,    apvts, envAmtId,    envAmtAttachment);
-
-    // Show Hz below 1 kHz, "Xk" above — prevents truncation in the text box
-    cutoffSlider.textFromValueFunction = [](double v)
-    {
-        if (v >= 1000.0)
-            return juce::String (v / 1000.0, 1) + "k";
-        return juce::String ((int) v) + "Hz";
-    };
-    cutoffSlider.valueFromTextFunction = [](const juce::String& t)
-    {
-        if (t.endsWithIgnoreCase ("k"))
-            return t.dropLastCharacters (1).getDoubleValue() * 1000.0;
-        return t.getDoubleValue();
-    };
 }
 
 FilterComponent::~FilterComponent()
@@ -49,7 +39,7 @@ void FilterComponent::paint (juce::Graphics& g)
 {
     g.fillAll (juce::Colour (0xff4A90E2));
     g.setColour (juce::Colours::white);
-    g.drawRect (getLocalBounds(), 2);
+    g.drawRect (getLocalBounds(), 1);
     g.setFont (juce::FontOptions (12.0f).withStyle ("Bold"));
     g.drawText ("FILTER TYPE", getLocalBounds().reduced (8).withHeight (14), juce::Justification::centredLeft);
 }
@@ -62,17 +52,17 @@ void FilterComponent::resized()
     const auto gap         = 10;
 
     // Title text is drawn in paint() at bounds.getY() with height 14.
-    // Combo box sits just below the title.
-    const auto typeComboY = bounds.getY() + labelHeight + 2;
+    // Combo box sits just below the title with a little extra breathing room.
+    const auto typeComboY = bounds.getY() + labelHeight + 6;
     filterTypeSelector.setBounds (bounds.getX(), typeComboY, bounds.getWidth(), comboHeight);
 
-    // Knob row: label then knob, starting with a clear gap below the combo
-    const auto knobLabelY = typeComboY + comboHeight + 8;
-    const auto knobY      = knobLabelY + labelHeight + 2;
-    const auto knobHeight = bounds.getBottom() - knobY;
-    const auto knobWidth  = knobHeight;
-    const auto totalWidth = knobWidth * 3 + gap * 2;
-    const auto startX     = bounds.getX() + (bounds.getWidth() - totalWidth) / 2;
+    // Knob row: same size and label gap as OscComponent (68px knobs, 2px below label)
+    const auto knobLabelY    = typeComboY + comboHeight + 8;
+    const auto knobHeight    = 68;
+    const auto knobWidth     = knobHeight;
+    const auto knobY         = knobLabelY + labelHeight + 2;
+    const auto totalWidth    = knobWidth * 3 + gap * 2;
+    const auto startX        = bounds.getX() + (bounds.getWidth() - totalWidth) / 2;
 
     cutoffLabel.setBounds     (startX,                          knobLabelY, knobWidth, labelHeight);
     cutoffSlider.setBounds    (startX,                          knobY,      knobWidth, knobHeight);

@@ -68,7 +68,7 @@ void OscData::setWaveType (const int choice)
                 return phase < 0.125f ? 1.0f : -1.0f;
             });
             break;
-        
+
         case 7:
             // Noise
             initialise([](float x) {
