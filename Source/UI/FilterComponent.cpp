@@ -79,7 +79,7 @@ void FilterComponent::setSliderWithLabel (juce::Slider& slider, juce::Label& lab
                                            juce::String paramId,
                                            std::unique_ptr<SliderAttachment>& attachment)
 {
-    slider.setSliderStyle (juce::Slider::SliderStyle::RotaryHorizontalDrag);
+    slider.setSliderStyle (juce::Slider::SliderStyle::RotaryVerticalDrag);
     slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 50, 18);
     slider.setColour (juce::Slider::thumbColourId,               juce::Colours::white);
     slider.setColour (juce::Slider::rotarySliderFillColourId,    juce::Colours::white);

@@ -50,8 +50,14 @@ void PresetComponent::PresetBoxLookAndFeel::drawButtonText (
                                                             : juce::TextButton::textColourOffId)
                      .withMultipliedAlpha (button.isEnabled() ? 1.0f : 0.5f));
     g.setFont (getTextButtonFont (button, button.getHeight()));
-    g.drawFittedText (button.getButtonText(), button.getLocalBounds(),
-                      juce::Justification::centred, 1);
+
+    // < and > glyphs render visually below mathematical centre; shift up 2px
+    auto bounds = button.getLocalBounds();
+    auto text   = button.getButtonText();
+    if (text == "<" || text == ">")
+        bounds.translate (0, -2);
+
+    g.drawFittedText (text, bounds, juce::Justification::centred, 1);
 }
 
 void PresetComponent::PresetBoxLookAndFeel::positionComboBoxText (juce::ComboBox& box, juce::Label& label)

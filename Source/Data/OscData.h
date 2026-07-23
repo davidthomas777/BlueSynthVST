@@ -30,3 +30,4 @@ private:
     float lastBaseHz { 0.0f };
     float detuneOffsetSemitones { 0.0f };
 };
+
