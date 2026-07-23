@@ -25,42 +25,75 @@ public:
     void pitchWheelMoved (int newPitchWheelValue) override;
     void prepareToPlay (double sampleRate, int samplesPerBlock, int outputChannels);
     void renderNextBlock (juce::AudioBuffer< float > &outputBuffer, int startSample, int numSamples) override;
-    void update (const float attack, const float decay, const float sustain, const float release);
-    void updateFilter (float cutoff, float resonance, float envAmt, int type);
+
+    // Osc 1
+    void setOsc1Enabled  (bool enabled);
+    void setOsc1Gain     (float g);
+    void update          (float attack, float decay, float sustain, float release);
+    void updateFilter    (float cutoff, float resonance, float envAmt, int type);
     void updateFilterEnv (float attack, float decay, float sustain, float release);
-    void setOscWaveType    (int choice);
-    void setOscFmParams    (float depth, float freq);
-    void updateUnison      (int numVoices, float detune);
-    void updatePortamento  (float time);
-    void updatePitch       (float semitones);
+    void setOscWaveType  (int choice);
+    void setOscFmParams  (float depth, float freq);
+    void updateUnison    (int numVoices, float detune);
+    void updatePortamento (float time);
+    void updatePitch      (float semitones);
+
+    // Osc 2
+    void setOsc2Enabled   (bool enabled);
+    void setOsc2Gain      (float g);
+    void setOsc2WaveType  (int choice);
+    void setOsc2FmParams  (float depth, float freq);
+    void updateUnison2    (int numVoices, float detune);
+    void update2          (float attack, float decay, float sustain, float release);
+    void updateFilter2    (float cutoff, float resonance, float envAmt, int type);
+    void updateFilterEnv2 (float attack, float decay, float sustain, float release);
 
 private:
     static constexpr int maxUnisonVoices = 8;
 
-    AdsrData adsr;
-    AdsrData filterAdsr;
-    juce::AudioBuffer<float> synthBuffer;
-    juce::AudioBuffer<float> unisonTempBuffer;
-
+    // --- Osc 1 ---
+    bool  osc1Enabled     { true };
     std::array<OscData, maxUnisonVoices> unisonOscs;
     int   numUnisonVoices { 1 };
     float unisonDetune    { 0.0f };
 
+    AdsrData   adsr;
+    AdsrData   filterAdsr;
     FilterData filter;
-
-    // juce::dsp::Oscillator<float> osc { [](float x) { return x < 0.0f ? -1.0f : 1.0f; }, 200};
     juce::dsp::Gain<float> gain;
 
-    float filterEnvAmt  { 0.0f };
-    float filterCutoff  { 20000.0f };
-    float filterRes     { 0.1f };
-    int   filterType    { 0 };
+    float filterEnvAmt { 0.0f };
+    float filterCutoff { 20000.0f };
+    float filterRes    { 0.1f };
+    int   filterType   { 0 };
 
-    float currentHz         { 0.0f };
-    float targetHz          { 0.0f };
-    float portamentoTime    { 0.0f };
+    // --- Osc 2 ---
+    std::array<OscData, maxUnisonVoices> unisonOscs2;
+    int   numUnisonVoices2 { 1 };
+    float unisonDetune2    { 0.0f };
+    bool  osc2Enabled      { false };
+
+    AdsrData   adsr2;
+    AdsrData   filterAdsr2;
+    FilterData filter2;
+    juce::dsp::Gain<float> gain2;
+
+    float filterEnvAmt2 { 0.0f };
+    float filterCutoff2 { 20000.0f };
+    float filterRes2    { 0.1f };
+    int   filterType2   { 0 };
+
+    // --- Shared buffers ---
+    juce::AudioBuffer<float> synthBuffer;
+    juce::AudioBuffer<float> osc2Buffer;
+    juce::AudioBuffer<float> unisonTempBuffer;
+
+    // --- Pitch / portamento (shared) ---
+    float currentHz            { 0.0f };
+    float targetHz             { 0.0f };
+    float portamentoTime       { 0.0f };
     float pitchOffsetSemitones { 0.0f };
-    double storedSampleRate { 44100.0 };
+    double storedSampleRate    { 44100.0 };
 
     void updateOscFrequencies();
 
