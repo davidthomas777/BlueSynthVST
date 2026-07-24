@@ -302,6 +302,10 @@ void BlueSynthAudioProcessorEditor::paint (juce::Graphics& g)
     g.drawRect (juce::Rectangle<int> (box3X, kBoxY, kBoxW, kBoxH), 1);
     g.drawRect (juce::Rectangle<int> (box2X, kBoxY, kBoxW, kBoxH), 1);
     g.drawRect (juce::Rectangle<int> (box1X, kBoxY, kBoxW, kBoxH), 1);
+
+    // Oscilloscope panel outlines — visible even when idle/silent
+    g.drawRect (juce::Rectangle<int> (kCol1X, kVisY, kColW, kVisH), 1);
+    g.drawRect (juce::Rectangle<int> (kCol2X, kVisY, kColW, kVisH), 1);
 }
 
 void BlueSynthAudioProcessorEditor::resized()
