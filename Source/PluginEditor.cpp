@@ -280,9 +280,9 @@ BlueSynthAudioProcessorEditor::~BlueSynthAudioProcessorEditor()
 
 void BlueSynthAudioProcessorEditor::timerCallback()
 {
-    audioProcessor.copyVisualizerSnapshots (osc1VisScratch, osc2VisScratch);
-    osc1Visualiser.pushBuffer (osc1VisScratch);
-    osc2Visualiser.pushBuffer (osc2VisScratch);
+    audioProcessor.drainVisualizerAudio (osc1VisScratch, osc2VisScratch);
+    if (osc1VisScratch.getNumSamples() > 0) osc1Visualiser.pushBuffer (osc1VisScratch);
+    if (osc2VisScratch.getNumSamples() > 0) osc2Visualiser.pushBuffer (osc2VisScratch);
 }
 
 //==============================================================================
