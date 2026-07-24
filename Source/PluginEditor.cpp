@@ -18,7 +18,7 @@ static constexpr int kCol2X = kCol1X + kColW + kGap;  // = 560
 
 // Vertical positions
 static constexpr int kPresetY   = 32;
-static constexpr int kToggleY   = 60;   // enable-button + volume knob row (h=42)
+static constexpr int kToggleY   = 60;   // enable-button + gain/octave knob row (h=42)
 static constexpr int kWaveY     = 106;  // wave-selector row
 static constexpr int kAdsrY     = 134;
 static constexpr int kFilterY   = 283;
@@ -172,6 +172,24 @@ BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProc
     osc1VolumeKnob.setColour (juce::Slider::rotarySliderOutlineColourId, juce::Colours::black);
     osc1VolumeAttachment = std::make_unique<SliderAttachment> (audioProcessor.apvts, "OSC1GAIN", osc1VolumeKnob);
     addAndMakeVisible (osc1VolumeKnob);
+    styleLabel (osc1VolumeLabel, "GAIN");
+    osc1VolumeLabel.setJustificationType (juce::Justification::centredRight);
+    osc1VolumeLabel.setBorderSize (juce::BorderSize<int> (0));
+    addAndMakeVisible (osc1VolumeLabel);
+
+    // ---- Osc 1 octave knob ----
+    osc1OctaveKnob.setSliderStyle (juce::Slider::RotaryVerticalDrag);
+    osc1OctaveKnob.setTextBoxStyle (juce::Slider::NoTextBox, true, 0, 0);
+    osc1OctaveKnob.setColour (juce::Slider::thumbColourId,               juce::Colours::white);
+    osc1OctaveKnob.setColour (juce::Slider::rotarySliderFillColourId,    juce::Colours::white);
+    osc1OctaveKnob.setColour (juce::Slider::rotarySliderOutlineColourId, juce::Colours::black);
+    osc1OctaveKnob.setNumDecimalPlacesToDisplay (0);
+    osc1OctaveAttachment = std::make_unique<SliderAttachment> (audioProcessor.apvts, "OSC1OCTAVE", osc1OctaveKnob);
+    addAndMakeVisible (osc1OctaveKnob);
+    styleLabel (osc1OctaveLabel, "OCT");
+    osc1OctaveLabel.setJustificationType (juce::Justification::centredRight);
+    osc1OctaveLabel.setBorderSize (juce::BorderSize<int> (0));
+    addAndMakeVisible (osc1OctaveLabel);
 
     // ---- Osc 1 wave selector ----
     juce::StringArray waveChoices { "Sine","Saw","Saw Inverse","Square","Triangle","Pulse 1","Pulse 2","Noise" };
@@ -199,6 +217,24 @@ BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProc
     osc2VolumeKnob.setColour (juce::Slider::rotarySliderOutlineColourId, juce::Colours::black);
     osc2VolumeAttachment = std::make_unique<SliderAttachment> (audioProcessor.apvts, "OSC2GAIN", osc2VolumeKnob);
     addAndMakeVisible (osc2VolumeKnob);
+    styleLabel (osc2VolumeLabel, "GAIN");
+    osc2VolumeLabel.setJustificationType (juce::Justification::centredRight);
+    osc2VolumeLabel.setBorderSize (juce::BorderSize<int> (0));
+    addAndMakeVisible (osc2VolumeLabel);
+
+    // ---- Osc 2 octave knob ----
+    osc2OctaveKnob.setSliderStyle (juce::Slider::RotaryVerticalDrag);
+    osc2OctaveKnob.setTextBoxStyle (juce::Slider::NoTextBox, true, 0, 0);
+    osc2OctaveKnob.setColour (juce::Slider::thumbColourId,               juce::Colours::white);
+    osc2OctaveKnob.setColour (juce::Slider::rotarySliderFillColourId,    juce::Colours::white);
+    osc2OctaveKnob.setColour (juce::Slider::rotarySliderOutlineColourId, juce::Colours::black);
+    osc2OctaveKnob.setNumDecimalPlacesToDisplay (0);
+    osc2OctaveAttachment = std::make_unique<SliderAttachment> (audioProcessor.apvts, "OSC2OCTAVE", osc2OctaveKnob);
+    addAndMakeVisible (osc2OctaveKnob);
+    styleLabel (osc2OctaveLabel, "OCT");
+    osc2OctaveLabel.setJustificationType (juce::Justification::centredRight);
+    osc2OctaveLabel.setBorderSize (juce::BorderSize<int> (0));
+    addAndMakeVisible (osc2OctaveLabel);
 
     // ---- Osc 2 wave selector ----
     osc2WaveSelector.addItemList (waveChoices, 1);
@@ -266,11 +302,22 @@ void BlueSynthAudioProcessorEditor::resized()
 
     const int kVolKnobSize = 42;  // square rotary, no text box
     const int kToggleW    = 90;  // just wide enough for "OSC 1" + checkbox
+    const int kKnobGap    = 8;   // gap between the octave and gain knob pairs
+    const int kLabelW     = 24;  // "Oct"/"Gain" label, to the left of its knob
+    const int kLabelGap   = 1;   // gap between label and its knob
+    const int kPairW      = kLabelW + kLabelGap + kVolKnobSize;
 
     // ---- Osc 1 column ----
     // Toggle shifted 4px left so its checkbox visually aligns with the combo box outline
     osc1EnableButton .setBounds (kCol1X - 4, kToggleY, kToggleW, kVolKnobSize);
-    osc1VolumeKnob   .setBounds (kCol1X + kColW - kVolKnobSize, kToggleY, kVolKnobSize, kVolKnobSize);
+
+    const int osc1GainPairX = kCol1X + kColW - kPairW;
+    const int osc1OctPairX  = osc1GainPairX - kKnobGap - kPairW;
+    osc1OctaveLabel  .setBounds (osc1OctPairX,               kToggleY, kLabelW, kVolKnobSize);
+    osc1OctaveKnob   .setBounds (osc1OctPairX + kLabelW + kLabelGap, kToggleY, kVolKnobSize, kVolKnobSize);
+    osc1VolumeLabel  .setBounds (osc1GainPairX,               kToggleY, kLabelW, kVolKnobSize);
+    osc1VolumeKnob   .setBounds (osc1GainPairX + kLabelW + kLabelGap, kToggleY, kVolKnobSize, kVolKnobSize);
+
     oscWaveSelector  .setBounds (kCol1X, kWaveY,    kColW, 24);
     adsr             .setBounds (kCol1X, kAdsrY,    kColW, 141);
     filterComponent  .setBounds (kCol1X, kFilterY,  kColW, 153);
@@ -279,7 +326,14 @@ void BlueSynthAudioProcessorEditor::resized()
 
     // ---- Osc 2 column ----
     osc2EnableButton .setBounds (kCol2X - 4, kToggleY, kToggleW, kVolKnobSize);
-    osc2VolumeKnob   .setBounds (kCol2X + kColW - kVolKnobSize, kToggleY, kVolKnobSize, kVolKnobSize);
+
+    const int osc2GainPairX = kCol2X + kColW - kPairW;
+    const int osc2OctPairX  = osc2GainPairX - kKnobGap - kPairW;
+    osc2OctaveLabel  .setBounds (osc2OctPairX,               kToggleY, kLabelW, kVolKnobSize);
+    osc2OctaveKnob   .setBounds (osc2OctPairX + kLabelW + kLabelGap, kToggleY, kVolKnobSize, kVolKnobSize);
+    osc2VolumeLabel  .setBounds (osc2GainPairX,               kToggleY, kLabelW, kVolKnobSize);
+    osc2VolumeKnob   .setBounds (osc2GainPairX + kLabelW + kLabelGap, kToggleY, kVolKnobSize, kVolKnobSize);
+
     osc2WaveSelector .setBounds (kCol2X, kWaveY,    kColW, 24);
     adsr2            .setBounds (kCol2X, kAdsrY,    kColW, 141);
     filterComponent2 .setBounds (kCol2X, kFilterY,  kColW, 153);

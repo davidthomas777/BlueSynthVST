@@ -45,6 +45,9 @@ private:
     // ---- Osc 1 ----
     juce::ToggleButton osc1EnableButton;
     juce::Slider       osc1VolumeKnob;
+    juce::Label        osc1VolumeLabel { "Volume", "Volume" };
+    juce::Slider       osc1OctaveKnob;
+    juce::Label        osc1OctaveLabel { "Oct", "Oct" };
     juce::ComboBox     oscWaveSelector;
     ADSRComponent      adsr;
     FilterComponent filterComponent;
@@ -54,6 +57,9 @@ private:
     // ---- Osc 2 ----
     juce::ToggleButton osc2EnableButton;
     juce::Slider       osc2VolumeKnob;
+    juce::Label        osc2VolumeLabel { "Volume", "Volume" };
+    juce::Slider       osc2OctaveKnob;
+    juce::Label        osc2OctaveLabel { "Oct", "Oct" };
     juce::ComboBox     osc2WaveSelector;
     ADSRComponent      adsr2;
     FilterComponent    filterComponent2;
@@ -78,7 +84,9 @@ private:
     std::unique_ptr<ComboBoxAttachment> waveSelectorAttachment;
     std::unique_ptr<ButtonAttachment>   osc1EnableAttachment;
     std::unique_ptr<SliderAttachment>   osc1VolumeAttachment;
+    std::unique_ptr<SliderAttachment>   osc1OctaveAttachment;
     std::unique_ptr<SliderAttachment>   osc2VolumeAttachment;
+    std::unique_ptr<SliderAttachment>   osc2OctaveAttachment;
     std::unique_ptr<ComboBoxAttachment> osc2WaveSelectorAttachment;
     std::unique_ptr<ButtonAttachment>   osc2EnableAttachment;
 
