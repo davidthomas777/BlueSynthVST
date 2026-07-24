@@ -82,41 +82,41 @@ void OscData::setWaveType (const int choice)
     }
 }
 
-void OscData::setWaveFrequency(const int midiNoteNumber)
-{
-    setFrequency (juce::MidiMessage::getMidiNoteInHertz (midiNoteNumber) + fmMod);
-    lastMidiNote = midiNoteNumber;
-}
-
 void OscData::getNextAudioBlock (juce::dsp::AudioBlock<float>& block)
 {
-    for (int ch = 0; ch < block.getNumChannels(); ++ch) {
-        for (int s = 0; s < block.getNumSamples(); ++s) {
-            fmMod = fmOsc.processSample (block.getSample (ch, s)) * fmDepth;
-        }
-    }
-    process (juce::dsp::ProcessContextReplacing<float> (block));
-}
+    const bool fmActive = (fmDepth != 0.0f && fmOscFreq != 0.0f);
 
-void OscData::setWaveFrequencyDetune (int midiNoteNumber, float detuneSemitones)
-{
-    lastMidiNote          = midiNoteNumber;
-    lastBaseHz            = juce::MidiMessage::getMidiNoteInHertz (midiNoteNumber);
-    detuneOffsetSemitones = detuneSemitones;
-    setFrequency (lastBaseHz * std::pow (2.0f, detuneSemitones / 12.0f) + fmMod);
+    if (! fmActive)
+    {
+        setFrequency (carrierBaseFreq);
+        process (juce::dsp::ProcessContextReplacing<float> (block));
+        return;
+    }
+
+    const int numSamples  = (int) block.getNumSamples();
+    const int numChannels = (int) block.getNumChannels();
+
+    for (int s = 0; s < numSamples; ++s)
+    {
+        float modSample = fmOsc.processSample (0.0f);
+        float instFreq  = carrierBaseFreq + modSample * fmDepth;
+
+        setFrequency (instFreq, true);
+        float carrierSample = processSample (0.0f);
+
+        for (int ch = 0; ch < numChannels; ++ch)
+            block.setSample (ch, s, carrierSample);
+    }
 }
 
 void OscData::setWaveFrequencyHz (float baseHz, float detuneSemitones)
 {
-    lastBaseHz            = baseHz;
-    detuneOffsetSemitones = detuneSemitones;
-    setFrequency (baseHz * std::pow (2.0f, detuneSemitones / 12.0f) + fmMod);
+    carrierBaseFreq = baseHz * std::pow (2.0f, detuneSemitones / 12.0f);
 }
 
 void OscData::setFmParams (const float depth, const float freq)
 {
     fmOsc.setFrequency (freq);
-    fmDepth = depth;
-    float currentFreq = lastBaseHz * std::pow (2.0f, detuneOffsetSemitones / 12.0f) + fmMod;
-    setFrequency (currentFreq >= 0.0f ? currentFreq : -currentFreq);
+    fmOscFreq = freq;
+    fmDepth   = depth;
 }

@@ -83,6 +83,14 @@ private:
     float filterRes2    { 0.1f };
     int   filterType2   { 0 };
 
+    // --- Filter coefficient recompute cache (avoid redundant per-sample recalculation) ---
+    float lastAppliedCutoff  { -1.0f };
+    float lastAppliedRes     { -1.0f };
+    int   lastAppliedType    { -1 };
+    float lastAppliedCutoff2 { -1.0f };
+    float lastAppliedRes2    { -1.0f };
+    int   lastAppliedType2   { -1 };
+
     // --- Shared buffers ---
     juce::AudioBuffer<float> synthBuffer;
     juce::AudioBuffer<float> osc2Buffer;

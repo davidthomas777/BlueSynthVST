@@ -25,7 +25,7 @@ BlueSynthAudioProcessor::BlueSynthAudioProcessor()
 #endif
 {
     synth.addSound (new SynthSound());
-    for (int i = 0; i < 64; ++i)
+    for (int i = 0; i < 32; ++i)
         synth.addVoice (new SynthVoice());
 }
 
@@ -105,83 +105,104 @@ void BlueSynthAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear (i, 0, buffer.getNumSamples());
 
+    // --- Osc 1 --- (fetched once per block: identical for every voice)
+    const bool  osc1Enabled  = apvts.getRawParameterValue ("OSC1ENABLED")->load() >= 0.5f;
+    const float attack       = apvts.getRawParameterValue ("ATTACK")->load();
+    const float decay        = apvts.getRawParameterValue ("DECAY")->load();
+    const float sustain      = apvts.getRawParameterValue ("SUSTAIN")->load();
+    const float release      = apvts.getRawParameterValue ("RELEASE")->load();
+
+    const int   oscWaveChoice = static_cast<int> (apvts.getRawParameterValue ("OSC1WAVETYPE")->load());
+    const float fmDepth       = apvts.getRawParameterValue ("FMDEPTH")->load();
+    const float fmFreq        = apvts.getRawParameterValue ("FMFREQ")->load();
+
+    const float filterCutoff = apvts.getRawParameterValue ("FILTERCUTOFF")->load();
+    const float filterRes    = apvts.getRawParameterValue ("FILTERRES")->load();
+    const float filterEnvAmt = apvts.getRawParameterValue ("FILTERENVAMT")->load();
+    const int   filterType   = static_cast<int> (apvts.getRawParameterValue ("FILTERTYPE")->load());
+
+    const float fEnvAtk = apvts.getRawParameterValue ("FILTERENVATTACK")->load();
+    const float fEnvDec = apvts.getRawParameterValue ("FILTERENVDECAY")->load();
+    const float fEnvSus = apvts.getRawParameterValue ("FILTERENVSUSTAIN")->load();
+    const float fEnvRel = apvts.getRawParameterValue ("FILTERENVRELEASE")->load();
+
+    const int   unisonVoices = static_cast<int> (apvts.getRawParameterValue ("UNISONVOICES")->load());
+    const float unisonDetune = apvts.getRawParameterValue ("UNISONDETUNE")->load();
+    const float portamento   = apvts.getRawParameterValue ("PORTAMENTO")->load();
+    const float pitch        = apvts.getRawParameterValue ("PITCH")->load();
+
+    const float osc1Gain = apvts.getRawParameterValue ("OSC1GAIN")->load();
+
+    // --- Osc 2 --- (fetched once per block: identical for every voice)
+    const bool  osc2Enabled    = apvts.getRawParameterValue ("OSC2ENABLED")->load() >= 0.5f;
+    const int   osc2WaveChoice = static_cast<int> (apvts.getRawParameterValue ("OSC2WAVETYPE")->load());
+    const float fmDepth2       = apvts.getRawParameterValue ("FMDEPTH2")->load();
+    const float fmFreq2        = apvts.getRawParameterValue ("FMFREQ2")->load();
+
+    const float attack2  = apvts.getRawParameterValue ("ATTACK2")->load();
+    const float decay2   = apvts.getRawParameterValue ("DECAY2")->load();
+    const float sustain2 = apvts.getRawParameterValue ("SUSTAIN2")->load();
+    const float release2 = apvts.getRawParameterValue ("RELEASE2")->load();
+
+    const float filterCutoff2 = apvts.getRawParameterValue ("FILTERCUTOFF2")->load();
+    const float filterRes2    = apvts.getRawParameterValue ("FILTERRES2")->load();
+    const float filterEnvAmt2 = apvts.getRawParameterValue ("FILTERENVAMT2")->load();
+    const int   filterType2   = static_cast<int> (apvts.getRawParameterValue ("FILTERTYPE2")->load());
+
+    const float fEnvAtk2 = apvts.getRawParameterValue ("FILTERENVATTACK2")->load();
+    const float fEnvDec2 = apvts.getRawParameterValue ("FILTERENVDECAY2")->load();
+    const float fEnvSus2 = apvts.getRawParameterValue ("FILTERENVSUSTAIN2")->load();
+    const float fEnvRel2 = apvts.getRawParameterValue ("FILTERENVRELEASE2")->load();
+
+    const int   unisonVoices2 = static_cast<int> (apvts.getRawParameterValue ("UNISONVOICES2")->load());
+    const float unisonDetune2 = apvts.getRawParameterValue ("UNISONDETUNE2")->load();
+
+    const float osc2Gain = apvts.getRawParameterValue ("OSC2GAIN")->load();
+
+    // --- Change detection: only re-push wave type / ADSR params to voices when the
+    //     source value actually changed since the last block (avoids redundant
+    //     std::function reassignment / ADSR coefficient recompute across all voices) ---
+    const bool oscWaveChanged  = oscWaveChoice  != lastOscWaveChoice;
+    const bool osc2WaveChanged = osc2WaveChoice != lastOsc2WaveChoice;
+    const bool adsrChanged     = attack  != lastAttack  || decay  != lastDecay  || sustain  != lastSustain  || release  != lastRelease;
+    const bool adsr2Changed    = attack2 != lastAttack2 || decay2 != lastDecay2 || sustain2 != lastSustain2 || release2 != lastRelease2;
+    const bool filterEnvChanged  = fEnvAtk  != lastFEnvAtk  || fEnvDec  != lastFEnvDec  || fEnvSus  != lastFEnvSus  || fEnvRel  != lastFEnvRel;
+    const bool filterEnv2Changed = fEnvAtk2 != lastFEnvAtk2 || fEnvDec2 != lastFEnvDec2 || fEnvSus2 != lastFEnvSus2 || fEnvRel2 != lastFEnvRel2;
+
     for (int i = 0; i < synth.getNumVoices(); ++i)
     {
         if (auto voice = dynamic_cast<SynthVoice*>(synth.getVoice(i)))
         {
             // --- Osc 1 ---
-            auto& osc1Enabled   = *apvts.getRawParameterValue ("OSC1ENABLED");
-            auto& attack  = *apvts.getRawParameterValue ("ATTACK");
-            auto& decay   = *apvts.getRawParameterValue ("DECAY");
-            auto& sustain = *apvts.getRawParameterValue ("SUSTAIN");
-            auto& release = *apvts.getRawParameterValue ("RELEASE");
-
-            auto& oscWaveChoice = *apvts.getRawParameterValue ("OSC1WAVETYPE");
-            auto& fmDepth       = *apvts.getRawParameterValue ("FMDEPTH");
-            auto& fmFreq        = *apvts.getRawParameterValue ("FMFREQ");
-
-            auto& filterCutoff  = *apvts.getRawParameterValue ("FILTERCUTOFF");
-            auto& filterRes     = *apvts.getRawParameterValue ("FILTERRES");
-            auto& filterEnvAmt  = *apvts.getRawParameterValue ("FILTERENVAMT");
-            auto& filterType    = *apvts.getRawParameterValue ("FILTERTYPE");
-
-            auto& fEnvAtk = *apvts.getRawParameterValue ("FILTERENVATTACK");
-            auto& fEnvDec = *apvts.getRawParameterValue ("FILTERENVDECAY");
-            auto& fEnvSus = *apvts.getRawParameterValue ("FILTERENVSUSTAIN");
-            auto& fEnvRel = *apvts.getRawParameterValue ("FILTERENVRELEASE");
-
-            auto& unisonVoices = *apvts.getRawParameterValue ("UNISONVOICES");
-            auto& unisonDetune = *apvts.getRawParameterValue ("UNISONDETUNE");
-            auto& portamento   = *apvts.getRawParameterValue ("PORTAMENTO");
-            auto& pitch        = *apvts.getRawParameterValue ("PITCH");
-
-            auto& osc1Gain = *apvts.getRawParameterValue ("OSC1GAIN");
-            voice->setOsc1Enabled (osc1Enabled.load() >= 0.5f);
-            voice->setOsc1Gain    (osc1Gain.load());
-            voice->setOscWaveType (static_cast<int> (oscWaveChoice.load()));
+            voice->setOsc1Enabled (osc1Enabled);
+            voice->setOsc1Gain    (osc1Gain);
+            if (oscWaveChanged) voice->setOscWaveType (oscWaveChoice);
             voice->setOscFmParams   (fmDepth, fmFreq);
-            voice->updateUnison     (static_cast<int> (unisonVoices.load()), unisonDetune.load());
-            voice->updatePortamento (portamento.load());
-            voice->updatePitch      (pitch.load());
-            voice->update           (attack, decay, sustain, release);
-            voice->updateFilter     (filterCutoff, filterRes, filterEnvAmt, static_cast<int> (filterType.load()));
-            voice->updateFilterEnv  (fEnvAtk, fEnvDec, fEnvSus, fEnvRel);
+            voice->updateUnison     (unisonVoices, unisonDetune);
+            voice->updatePortamento (portamento);
+            voice->updatePitch      (pitch);
+            if (adsrChanged) voice->update (attack, decay, sustain, release);
+            voice->updateFilter     (filterCutoff, filterRes, filterEnvAmt, filterType);
+            if (filterEnvChanged) voice->updateFilterEnv (fEnvAtk, fEnvDec, fEnvSus, fEnvRel);
 
             // --- Osc 2 ---
-            auto& osc2Enabled    = *apvts.getRawParameterValue ("OSC2ENABLED");
-            auto& osc2WaveChoice = *apvts.getRawParameterValue ("OSC2WAVETYPE");
-            auto& fmDepth2       = *apvts.getRawParameterValue ("FMDEPTH2");
-            auto& fmFreq2        = *apvts.getRawParameterValue ("FMFREQ2");
-
-            auto& attack2  = *apvts.getRawParameterValue ("ATTACK2");
-            auto& decay2   = *apvts.getRawParameterValue ("DECAY2");
-            auto& sustain2 = *apvts.getRawParameterValue ("SUSTAIN2");
-            auto& release2 = *apvts.getRawParameterValue ("RELEASE2");
-
-            auto& filterCutoff2 = *apvts.getRawParameterValue ("FILTERCUTOFF2");
-            auto& filterRes2    = *apvts.getRawParameterValue ("FILTERRES2");
-            auto& filterEnvAmt2 = *apvts.getRawParameterValue ("FILTERENVAMT2");
-            auto& filterType2   = *apvts.getRawParameterValue ("FILTERTYPE2");
-
-            auto& fEnvAtk2 = *apvts.getRawParameterValue ("FILTERENVATTACK2");
-            auto& fEnvDec2 = *apvts.getRawParameterValue ("FILTERENVDECAY2");
-            auto& fEnvSus2 = *apvts.getRawParameterValue ("FILTERENVSUSTAIN2");
-            auto& fEnvRel2 = *apvts.getRawParameterValue ("FILTERENVRELEASE2");
-
-            auto& unisonVoices2 = *apvts.getRawParameterValue ("UNISONVOICES2");
-            auto& unisonDetune2 = *apvts.getRawParameterValue ("UNISONDETUNE2");
-
-            auto& osc2Gain = *apvts.getRawParameterValue ("OSC2GAIN");
-            voice->setOsc2Enabled (osc2Enabled.load() >= 0.5f);
-            voice->setOsc2Gain    (osc2Gain.load());
-            voice->setOsc2WaveType (static_cast<int> (osc2WaveChoice.load()));
+            voice->setOsc2Enabled (osc2Enabled);
+            voice->setOsc2Gain    (osc2Gain);
+            if (osc2WaveChanged) voice->setOsc2WaveType (osc2WaveChoice);
             voice->setOsc2FmParams  (fmDepth2, fmFreq2);
-            voice->updateUnison2    (static_cast<int> (unisonVoices2.load()), unisonDetune2.load());
-            voice->update2          (attack2, decay2, sustain2, release2);
-            voice->updateFilter2    (filterCutoff2, filterRes2, filterEnvAmt2, static_cast<int> (filterType2.load()));
-            voice->updateFilterEnv2 (fEnvAtk2, fEnvDec2, fEnvSus2, fEnvRel2);
+            voice->updateUnison2    (unisonVoices2, unisonDetune2);
+            if (adsr2Changed) voice->update2 (attack2, decay2, sustain2, release2);
+            voice->updateFilter2    (filterCutoff2, filterRes2, filterEnvAmt2, filterType2);
+            if (filterEnv2Changed) voice->updateFilterEnv2 (fEnvAtk2, fEnvDec2, fEnvSus2, fEnvRel2);
         }
     }
+
+    lastOscWaveChoice  = oscWaveChoice;
+    lastOsc2WaveChoice = osc2WaveChoice;
+    lastAttack = attack;   lastDecay = decay;   lastSustain = sustain;   lastRelease = release;
+    lastAttack2 = attack2; lastDecay2 = decay2; lastSustain2 = sustain2; lastRelease2 = release2;
+    lastFEnvAtk = fEnvAtk;   lastFEnvDec = fEnvDec;   lastFEnvSus = fEnvSus;   lastFEnvRel = fEnvRel;
+    lastFEnvAtk2 = fEnvAtk2; lastFEnvDec2 = fEnvDec2; lastFEnvSus2 = fEnvSus2; lastFEnvRel2 = fEnvRel2;
 
     synth.renderNextBlock (buffer, midiMessages, 0, buffer.getNumSamples());
     buffer.applyGain (apvts.getRawParameterValue ("MASTERGAIN")->load());
