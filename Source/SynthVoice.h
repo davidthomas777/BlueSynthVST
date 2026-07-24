@@ -39,6 +39,9 @@ public:
     void updatePitch      (float semitones);
     void updateOctave     (int octaves);
 
+    // Visualizer tap targets (owned by the processor; nullptr = no-op)
+    void setVisualizerTargets (juce::AudioBuffer<float>* osc1Target, juce::AudioBuffer<float>* osc2Target);
+
     // Osc 2
     void setOsc2Enabled   (bool enabled);
     void setOsc2Gain      (float g);
@@ -112,4 +115,8 @@ private:
     static std::atomic<float> lastPlayedHz;
 
     bool isPrepared { false };
+
+    // --- Visualizer tap targets ---
+    juce::AudioBuffer<float>* osc1VisTarget { nullptr };
+    juce::AudioBuffer<float>* osc2VisTarget { nullptr };
 };

@@ -58,9 +58,21 @@ public:
     juce::AudioProcessorValueTreeState apvts;
     PresetManager presetManager;
 
+    // Copies the latest completed block's per-oscillator audio (all voices summed,
+    // mono) into osc1Out/osc2Out for a UI-side visualizer to consume. Thread-safe to
+    // call from the message thread while processBlock runs on the audio thread.
+    void copyVisualizerSnapshots (juce::AudioBuffer<float>& osc1Out, juce::AudioBuffer<float>& osc2Out);
+
 private:
     juce::Synthesiser synth;
     juce::AudioProcessorValueTreeState::ParameterLayout createParameters();
+
+    // --- Oscilloscope tap buffers: all-voices-summed, mono, per oscillator ---
+    juce::AudioBuffer<float> osc1AccumBuffer;   // audio-thread scratch, filled during synth.renderNextBlock
+    juce::AudioBuffer<float> osc2AccumBuffer;
+    juce::AudioBuffer<float> osc1VisSnapshot;   // last completed block, read by the UI thread
+    juce::AudioBuffer<float> osc2VisSnapshot;
+    juce::SpinLock visLock;
 
     // --- Change-detection cache: avoids re-pushing wave type / ADSR params to every
     //     voice every block when the underlying parameter hasn't actually changed ---
