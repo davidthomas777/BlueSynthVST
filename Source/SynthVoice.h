@@ -15,6 +15,7 @@
 #include "Data/AdsrData.h"
 #include "Data/OscData.h"
 #include "Data/FilterData.h"
+#include "Data/VisualizerBuffer.h"
 
 class SynthVoice : public juce::SynthesiserVoice {
 public:
@@ -40,7 +41,7 @@ public:
     void updateOctave     (int octaves);
 
     // Visualizer tap targets (owned by the processor; nullptr = no-op)
-    void setVisualizerTargets (juce::AudioBuffer<float>* osc1Target, juce::AudioBuffer<float>* osc2Target);
+    void setVisualizerTargets (VisualizerBuffer* osc1Target, VisualizerBuffer* osc2Target);
 
     // Osc 2
     void setOsc2Enabled   (bool enabled);
@@ -117,6 +118,6 @@ private:
     bool isPrepared { false };
 
     // --- Visualizer tap targets ---
-    juce::AudioBuffer<float>* osc1VisTarget { nullptr };
-    juce::AudioBuffer<float>* osc2VisTarget { nullptr };
+    VisualizerBuffer* osc1VisTarget { nullptr };
+    VisualizerBuffer* osc2VisTarget { nullptr };
 };

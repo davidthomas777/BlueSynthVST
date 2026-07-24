@@ -123,7 +123,7 @@ void SynthVoice::updateUnison2 (int numVoices, float detune) {
     unisonDetune2    = detune;
 }
 
-void SynthVoice::setVisualizerTargets (juce::AudioBuffer<float>* osc1Target, juce::AudioBuffer<float>* osc2Target)
+void SynthVoice::setVisualizerTargets (VisualizerBuffer* osc1Target, VisualizerBuffer* osc2Target)
 {
     osc1VisTarget = osc1Target;
     osc2VisTarget = osc2Target;
@@ -264,7 +264,7 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer, int st
         adsr.applyEnvelopeToBuffer (synthBuffer, 0, synthBuffer.getNumSamples());
 
         if (osc1VisTarget != nullptr)
-            osc1VisTarget->addFrom (0, startSample, synthBuffer, 0, 0, numSamples);
+            osc1VisTarget->addFrom (startSample, synthBuffer, numSamples);
     }
     else
     {
@@ -304,7 +304,7 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer, int st
         adsr2.applyEnvelopeToBuffer (osc2Buffer, 0, osc2Buffer.getNumSamples());
 
         if (osc2VisTarget != nullptr)
-            osc2VisTarget->addFrom (0, startSample, osc2Buffer, 0, 0, numSamples);
+            osc2VisTarget->addFrom (startSample, osc2Buffer, numSamples);
 
         // Mix osc2 into osc1
         for (int ch = 0; ch < synthBuffer.getNumChannels(); ++ch)
