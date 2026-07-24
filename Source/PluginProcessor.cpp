@@ -78,8 +78,8 @@ void BlueSynthAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBl
         if (auto voice = dynamic_cast<SynthVoice*>(synth.getVoice(i)))
             voice->prepareToPlay (sampleRate, samplesPerBlock, getTotalNumOutputChannels());
 
-    osc1Vis.prepare (samplesPerBlock);
-    osc2Vis.prepare (samplesPerBlock);
+    osc1Vis.prepare (samplesPerBlock, sampleRate);
+    osc2Vis.prepare (samplesPerBlock, sampleRate);
 }
 
 void BlueSynthAudioProcessor::releaseResources() {}
@@ -225,10 +225,10 @@ void BlueSynthAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
     osc2Vis.publishBlock();
 }
 
-void BlueSynthAudioProcessor::copyVisualizerSnapshots (juce::AudioBuffer<float>& osc1Out, juce::AudioBuffer<float>& osc2Out)
+void BlueSynthAudioProcessor::drainVisualizerAudio (juce::AudioBuffer<float>& osc1Out, juce::AudioBuffer<float>& osc2Out)
 {
-    osc1Vis.copySnapshot (osc1Out);
-    osc2Vis.copySnapshot (osc2Out);
+    osc1Vis.drain (osc1Out);
+    osc2Vis.drain (osc2Out);
 }
 
 //==============================================================================

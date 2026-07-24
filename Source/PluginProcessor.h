@@ -59,10 +59,10 @@ public:
     juce::AudioProcessorValueTreeState apvts;
     PresetManager presetManager;
 
-    // Copies the latest completed block's per-oscillator audio (all voices summed,
-    // mono) into osc1Out/osc2Out for a UI-side visualizer to consume. Thread-safe to
-    // call from the message thread while processBlock runs on the audio thread.
-    void copyVisualizerSnapshots (juce::AudioBuffer<float>& osc1Out, juce::AudioBuffer<float>& osc2Out);
+    // Drains all per-oscillator audio (all voices summed, mono) accumulated since the
+    // last call into osc1Out/osc2Out, for a UI-side visualizer to consume. Thread-safe
+    // to call from the message thread while processBlock runs on the audio thread.
+    void drainVisualizerAudio (juce::AudioBuffer<float>& osc1Out, juce::AudioBuffer<float>& osc2Out);
 
 private:
     juce::Synthesiser synth;
