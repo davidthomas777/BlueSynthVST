@@ -61,6 +61,15 @@ public:
 private:
     juce::Synthesiser synth;
     juce::AudioProcessorValueTreeState::ParameterLayout createParameters();
+
+    // --- Change-detection cache: avoids re-pushing wave type / ADSR params to every
+    //     voice every block when the underlying parameter hasn't actually changed ---
+    int   lastOscWaveChoice  { -1 };
+    int   lastOsc2WaveChoice { -1 };
+    float lastAttack  { -1.0f }, lastDecay  { -1.0f }, lastSustain  { -1.0f }, lastRelease  { -1.0f };
+    float lastAttack2 { -1.0f }, lastDecay2 { -1.0f }, lastSustain2 { -1.0f }, lastRelease2 { -1.0f };
+    float lastFEnvAtk  { -1.0f }, lastFEnvDec  { -1.0f }, lastFEnvSus  { -1.0f }, lastFEnvRel  { -1.0f };
+    float lastFEnvAtk2 { -1.0f }, lastFEnvDec2 { -1.0f }, lastFEnvSus2 { -1.0f }, lastFEnvRel2 { -1.0f };
     
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (BlueSynthAudioProcessor)

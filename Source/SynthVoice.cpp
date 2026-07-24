@@ -240,7 +240,13 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer, int st
         {
             float env    = filterAdsr.getNextSample();
             float cutoff = juce::jlimit (20.0f, 20000.0f, filterCutoff + env * filterEnvAmt * 20000.0f);
-            filter.updateParams (cutoff, filterRes, filterType);
+            if (cutoff != lastAppliedCutoff || filterRes != lastAppliedRes || filterType != lastAppliedType)
+            {
+                filter.updateParams (cutoff, filterRes, filterType);
+                lastAppliedCutoff = cutoff;
+                lastAppliedRes    = filterRes;
+                lastAppliedType   = filterType;
+            }
             for (int ch = 0; ch < synthBuffer.getNumChannels(); ++ch)
                 synthBuffer.setSample (ch, s, filter.processSample (ch, synthBuffer.getSample (ch, s)));
         }
@@ -267,7 +273,13 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer, int st
         {
             float env    = filterAdsr2.getNextSample();
             float cutoff = juce::jlimit (20.0f, 20000.0f, filterCutoff2 + env * filterEnvAmt2 * 20000.0f);
-            filter2.updateParams (cutoff, filterRes2, filterType2);
+            if (cutoff != lastAppliedCutoff2 || filterRes2 != lastAppliedRes2 || filterType2 != lastAppliedType2)
+            {
+                filter2.updateParams (cutoff, filterRes2, filterType2);
+                lastAppliedCutoff2 = cutoff;
+                lastAppliedRes2    = filterRes2;
+                lastAppliedType2   = filterType2;
+            }
             for (int ch = 0; ch < osc2Buffer.getNumChannels(); ++ch)
                 osc2Buffer.setSample (ch, s, filter2.processSample (ch, osc2Buffer.getSample (ch, s)));
         }
