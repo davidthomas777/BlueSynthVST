@@ -13,7 +13,7 @@ A dual-oscillator subtractive/FM synthesizer plugin built with [JUCE](https://ju
   - Dedicated multi-mode filter (Low Pass / High Pass / Band Pass) with cutoff, resonance, and its own filter envelope
   - Independent gain and on/off toggle
 - **Portamento/glide** and a **pitch** offset knob (shared across oscillators)
-- **64-voice polyphony**
+- **32-voice polyphony**
 - **Preset system** — save, load, and delete presets (stored in `~/Documents/BlueSynth/Presets/`)
 - Master gain control
 
