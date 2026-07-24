@@ -10,6 +10,7 @@
 
 #include <JuceHeader.h>
 #include "Data/PresetManager.h"
+#include "Data/VisualizerBuffer.h"
 
 //==============================================================================
 /**
@@ -68,11 +69,8 @@ private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameters();
 
     // --- Oscilloscope tap buffers: all-voices-summed, mono, per oscillator ---
-    juce::AudioBuffer<float> osc1AccumBuffer;   // audio-thread scratch, filled during synth.renderNextBlock
-    juce::AudioBuffer<float> osc2AccumBuffer;
-    juce::AudioBuffer<float> osc1VisSnapshot;   // last completed block, read by the UI thread
-    juce::AudioBuffer<float> osc2VisSnapshot;
-    juce::SpinLock visLock;
+    VisualizerBuffer osc1Vis;
+    VisualizerBuffer osc2Vis;
 
     // --- Change-detection cache: avoids re-pushing wave type / ADSR params to every
     //     voice every block when the underlying parameter hasn't actually changed ---

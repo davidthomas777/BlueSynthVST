@@ -26,7 +26,11 @@ BlueSynthAudioProcessor::BlueSynthAudioProcessor()
 {
     synth.addSound (new SynthSound());
     for (int i = 0; i < 32; ++i)
-        synth.addVoice (new SynthVoice());
+    {
+        auto* voice = new SynthVoice();
+        voice->setVisualizerTargets (&osc1Vis, &osc2Vis);
+        synth.addVoice (voice);
+    }
 }
 
 BlueSynthAudioProcessor::~BlueSynthAudioProcessor() {}
@@ -73,6 +77,9 @@ void BlueSynthAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBl
     for (int i = 0; i < synth.getNumVoices(); ++i)
         if (auto voice = dynamic_cast<SynthVoice*>(synth.getVoice(i)))
             voice->prepareToPlay (sampleRate, samplesPerBlock, getTotalNumOutputChannels());
+
+    osc1Vis.prepare (samplesPerBlock);
+    osc2Vis.prepare (samplesPerBlock);
 }
 
 void BlueSynthAudioProcessor::releaseResources() {}
@@ -208,8 +215,20 @@ void BlueSynthAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
     lastFEnvAtk = fEnvAtk;   lastFEnvDec = fEnvDec;   lastFEnvSus = fEnvSus;   lastFEnvRel = fEnvRel;
     lastFEnvAtk2 = fEnvAtk2; lastFEnvDec2 = fEnvDec2; lastFEnvSus2 = fEnvSus2; lastFEnvRel2 = fEnvRel2;
 
+    osc1Vis.prepareBlock (buffer.getNumSamples());
+    osc2Vis.prepareBlock (buffer.getNumSamples());
+
     synth.renderNextBlock (buffer, midiMessages, 0, buffer.getNumSamples());
     buffer.applyGain (apvts.getRawParameterValue ("MASTERGAIN")->load());
+
+    osc1Vis.publishBlock();
+    osc2Vis.publishBlock();
+}
+
+void BlueSynthAudioProcessor::copyVisualizerSnapshots (juce::AudioBuffer<float>& osc1Out, juce::AudioBuffer<float>& osc2Out)
+{
+    osc1Vis.copySnapshot (osc1Out);
+    osc2Vis.copySnapshot (osc2Out);
 }
 
 //==============================================================================

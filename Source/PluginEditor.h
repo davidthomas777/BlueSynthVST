@@ -16,7 +16,8 @@
 #include "UI/PresetComponent.h"
 
 //==============================================================================
-class BlueSynthAudioProcessorEditor  : public juce::AudioProcessorEditor
+class BlueSynthAudioProcessorEditor  : public juce::AudioProcessorEditor,
+                                        private juce::Timer
 {
 public:
     BlueSynthAudioProcessorEditor (BlueSynthAudioProcessor&);
@@ -26,6 +27,8 @@ public:
     void resized() override;
 
 private:
+    void timerCallback() override;
+
     struct DownwardComboLookAndFeel : public juce::LookAndFeel_V4
     {
         juce::PopupMenu::Options getOptionsForComboBoxPopupMenu (juce::ComboBox&, juce::Label&) override;
@@ -53,6 +56,7 @@ private:
     FilterComponent filterComponent;
     ADSRComponent   filterEnv;
     OscComponent    osc;
+    juce::AudioVisualiserComponent osc1Visualiser { 1 };
 
     // ---- Osc 2 ----
     juce::ToggleButton osc2EnableButton;
@@ -65,6 +69,11 @@ private:
     FilterComponent    filterComponent2;
     ADSRComponent      filterEnv2;
     OscComponent       osc2;
+    juce::AudioVisualiserComponent osc2Visualiser { 1 };
+
+    // Scratch buffers the Timer copies processor snapshots into before pushing to the visualisers
+    juce::AudioBuffer<float> osc1VisScratch;
+    juce::AudioBuffer<float> osc2VisScratch;
 
     // ---- Master knobs ----
     juce::Slider gainSlider;
