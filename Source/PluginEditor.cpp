@@ -24,6 +24,8 @@ static constexpr int kAdsrY     = 134;
 static constexpr int kFilterY   = 283;
 static constexpr int kFiltEnvY  = 444;
 static constexpr int kOscKnobY  = 593;
+static constexpr int kVisY      = kOscKnobY + 95 + 8;  // free band below the osc knob panel
+static constexpr int kVisH      = 80;
 
 // Master-knob boxes (smaller than before: 70×70)
 static constexpr int kBoxW = 70;
@@ -118,6 +120,20 @@ BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProc
 {
     setLookAndFeel (&editorLookAndFeel);
     setSize (1100, 786);
+
+    auto styleVisualiser = [](juce::AudioVisualiserComponent& v)
+    {
+        v.setColours (juce::Colour (0xff4A90E2), juce::Colours::white);
+        v.setRepaintRate (30);
+        v.setBufferSize (256);
+        v.setSamplesPerBlock (2);
+    };
+    styleVisualiser (osc1Visualiser);
+    styleVisualiser (osc2Visualiser);
+    addAndMakeVisible (osc1Visualiser);
+    addAndMakeVisible (osc2Visualiser);
+
+    startTimerHz (30);
 
     auto styleKnob = [](juce::Slider& s) {
         s.setSliderStyle (juce::Slider::RotaryVerticalDrag);
@@ -258,7 +274,15 @@ BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProc
 
 BlueSynthAudioProcessorEditor::~BlueSynthAudioProcessorEditor()
 {
+    stopTimer();
     setLookAndFeel (nullptr);
+}
+
+void BlueSynthAudioProcessorEditor::timerCallback()
+{
+    audioProcessor.copyVisualizerSnapshots (osc1VisScratch, osc2VisScratch);
+    osc1Visualiser.pushBuffer (osc1VisScratch);
+    osc2Visualiser.pushBuffer (osc2VisScratch);
 }
 
 //==============================================================================
@@ -323,6 +347,7 @@ void BlueSynthAudioProcessorEditor::resized()
     filterComponent  .setBounds (kCol1X, kFilterY,  kColW, 153);
     filterEnv        .setBounds (kCol1X, kFiltEnvY, kColW, 141);
     osc              .setBounds (kCol1X, kOscKnobY, kColW, 95);
+    osc1Visualiser   .setBounds (kCol1X, kVisY,     kColW, kVisH);
 
     // ---- Osc 2 column ----
     osc2EnableButton .setBounds (kCol2X - 4, kToggleY, kToggleW, kVolKnobSize);
@@ -339,4 +364,5 @@ void BlueSynthAudioProcessorEditor::resized()
     filterComponent2 .setBounds (kCol2X, kFilterY,  kColW, 153);
     filterEnv2       .setBounds (kCol2X, kFiltEnvY, kColW, 141);
     osc2             .setBounds (kCol2X, kOscKnobY, kColW, 95);
+    osc2Visualiser   .setBounds (kCol2X, kVisY,     kColW, kVisH);
 }
