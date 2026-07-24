@@ -37,6 +37,7 @@ public:
     void updateUnison    (int numVoices, float detune);
     void updatePortamento (float time);
     void updatePitch      (float semitones);
+    void updateOctave     (int octaves);
 
     // Osc 2
     void setOsc2Enabled   (bool enabled);
@@ -47,6 +48,7 @@ public:
     void update2          (float attack, float decay, float sustain, float release);
     void updateFilter2    (float cutoff, float resonance, float envAmt, int type);
     void updateFilterEnv2 (float attack, float decay, float sustain, float release);
+    void updateOctave2    (int octaves);
 
 private:
     static constexpr int maxUnisonVoices = 8;
@@ -56,6 +58,7 @@ private:
     std::array<OscData, maxUnisonVoices> unisonOscs;
     int   numUnisonVoices { 1 };
     float unisonDetune    { 0.0f };
+    int   octave1         { 0 };
 
     AdsrData   adsr;
     AdsrData   filterAdsr;
@@ -72,6 +75,7 @@ private:
     int   numUnisonVoices2 { 1 };
     float unisonDetune2    { 0.0f };
     bool  osc2Enabled      { false };
+    int   octave2          { 0 };
 
     AdsrData   adsr2;
     AdsrData   filterAdsr2;

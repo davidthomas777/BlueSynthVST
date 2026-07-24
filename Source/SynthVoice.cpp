@@ -25,15 +25,15 @@ void SynthVoice::startNote (int midiNoteNumber, float velocity, juce::Synthesise
         currentHz = targetHz;
     lastPlayedHz.store (targetHz);
     updateOscFrequencies();
-    if (osc1Enabled) { adsr.noteOn();  filterAdsr.noteOn();  }
-    if (osc2Enabled) { adsr2.noteOn(); filterAdsr2.noteOn(); }
+    adsr.noteOn();  filterAdsr.noteOn();
+    adsr2.noteOn(); filterAdsr2.noteOn();
 }
 
 void SynthVoice::stopNote (float velocity, bool allowTailOff) {
-    if (osc1Enabled) { adsr.noteOff();  filterAdsr.noteOff();  }
-    if (osc2Enabled) { adsr2.noteOff(); filterAdsr2.noteOff(); }
+    adsr.noteOff();  filterAdsr.noteOff();
+    adsr2.noteOff(); filterAdsr2.noteOff();
 
-    bool anyActive = (osc1Enabled && adsr.isActive()) || (osc2Enabled && adsr2.isActive());
+    bool anyActive = adsr.isActive() || adsr2.isActive();
     if (!allowTailOff || !anyActive)
         clearCurrentNote();
 }
@@ -125,6 +125,8 @@ void SynthVoice::updateUnison2 (int numVoices, float detune) {
 
 void SynthVoice::updatePortamento (float time)      { portamentoTime       = time; }
 void SynthVoice::updatePitch      (float semitones) { pitchOffsetSemitones = semitones; }
+void SynthVoice::updateOctave     (int octaves)      { octave1 = octaves; }
+void SynthVoice::updateOctave2    (int octaves)      { octave2 = octaves; }
 void SynthVoice::setOsc1Enabled (bool enabled) { osc1Enabled = enabled; }
 void SynthVoice::setOsc2Enabled (bool enabled) { osc2Enabled = enabled; }
 void SynthVoice::setOsc1Gain    (float g)      { gain.setGainLinear  (g * 0.5f); }
@@ -132,7 +134,9 @@ void SynthVoice::setOsc2Gain    (float g)      { gain2.setGainLinear (g * 0.5f);
 
 void SynthVoice::updateOscFrequencies()
 {
-    float pitchedHz = currentHz * std::pow (2.0f, pitchOffsetSemitones / 12.0f);
+    float pitchedHz  = currentHz * std::pow (2.0f, pitchOffsetSemitones / 12.0f);
+    float pitchedHz1 = pitchedHz * std::pow (2.0f, (float) octave1);
+    float pitchedHz2 = pitchedHz * std::pow (2.0f, (float) octave2);
 
     for (int i = 0; i < numUnisonVoices; ++i)
     {
@@ -140,7 +144,7 @@ void SynthVoice::updateOscFrequencies()
         if (numUnisonVoices > 1)
             offset = juce::jmap ((float)i, 0.0f, (float)(numUnisonVoices - 1),
                                  -unisonDetune * 0.5f, unisonDetune * 0.5f);
-        unisonOscs[i].setWaveFrequencyHz (pitchedHz, offset);
+        unisonOscs[i].setWaveFrequencyHz (pitchedHz1, offset);
     }
 
     for (int i = 0; i < numUnisonVoices2; ++i)
@@ -149,7 +153,7 @@ void SynthVoice::updateOscFrequencies()
         if (numUnisonVoices2 > 1)
             offset = juce::jmap ((float)i, 0.0f, (float)(numUnisonVoices2 - 1),
                                  -unisonDetune2 * 0.5f, unisonDetune2 * 0.5f);
-        unisonOscs2[i].setWaveFrequencyHz (pitchedHz, offset);
+        unisonOscs2[i].setWaveFrequencyHz (pitchedHz2, offset);
     }
 }
 
@@ -253,6 +257,10 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer, int st
 
         adsr.applyEnvelopeToBuffer (synthBuffer, 0, synthBuffer.getNumSamples());
     }
+    else
+    {
+        for (int s = 0; s < numSamples; ++s) adsr.getNextSample();
+    }
 
     // ================================================================
     // OSC 2 chain (when enabled): unison → gain → filter+filterEnv → ampADSR
@@ -290,6 +298,10 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer, int st
         for (int ch = 0; ch < synthBuffer.getNumChannels(); ++ch)
             synthBuffer.addFrom (ch, 0, osc2Buffer, ch, 0, synthBuffer.getNumSamples());
     }
+    else
+    {
+        for (int s = 0; s < numSamples; ++s) adsr2.getNextSample();
+    }
 
     // ================================================================
     // Write to output
@@ -297,7 +309,7 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer, int st
     for (int ch = 0; ch < outputBuffer.getNumChannels(); ++ch)
         outputBuffer.addFrom (ch, startSample, synthBuffer, ch, 0, numSamples);
 
-    bool anyActive = (osc1Enabled && adsr.isActive()) || (osc2Enabled && adsr2.isActive());
+    bool anyActive = adsr.isActive() || adsr2.isActive();
     if (!anyActive)
         clearCurrentNote();
 }
