@@ -75,6 +75,8 @@ private:
     juce::ToggleButton osc1EnableButton;
     juce::Slider       osc1VolumeKnob;
     juce::Label        osc1VolumeLabel { "Volume", "Volume" };
+    juce::Slider       osc1PitchKnob;
+    juce::Label        osc1PitchLabel { "Pitch", "Pitch" };
     juce::Slider       osc1OctaveKnob;
     juce::Label        osc1OctaveLabel { "Oct", "Oct" };
     juce::ComboBox     oscWaveSelector;
@@ -88,6 +90,8 @@ private:
     juce::ToggleButton osc2EnableButton;
     juce::Slider       osc2VolumeKnob;
     juce::Label        osc2VolumeLabel { "Volume", "Volume" };
+    juce::Slider       osc2PitchKnob;
+    juce::Label        osc2PitchLabel { "Pitch", "Pitch" };
     juce::Slider       osc2OctaveKnob;
     juce::Label        osc2OctaveLabel { "Oct", "Oct" };
     juce::ComboBox     osc2WaveSelector;
@@ -120,8 +124,10 @@ private:
     std::unique_ptr<ButtonAttachment>   osc1EnableAttachment;
     std::unique_ptr<SliderAttachment>   osc1VolumeAttachment;
     std::unique_ptr<SliderAttachment>   osc1OctaveAttachment;
+    std::unique_ptr<SliderAttachment>   osc1PitchAttachment;
     std::unique_ptr<SliderAttachment>   osc2VolumeAttachment;
     std::unique_ptr<SliderAttachment>   osc2OctaveAttachment;
+    std::unique_ptr<SliderAttachment>   osc2PitchAttachment;
     std::unique_ptr<ComboBoxAttachment> osc2WaveSelectorAttachment;
     std::unique_ptr<ButtonAttachment>   osc2EnableAttachment;
 
