@@ -8,6 +8,7 @@
 
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "UI/AppFont.h"
 
 // ---------------------------------------------------------------------------
 // Layout constants — all positions are derived from these so they stay consistent
@@ -159,7 +160,7 @@ BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProc
     };
     auto styleLabel = [](juce::Label& l, const juce::String& text) {
         l.setText (text, juce::dontSendNotification);
-        l.setFont (juce::FontOptions (11.0f).withStyle ("Bold"));
+        l.setFont (appFont (11.0f));
         l.setColour (juce::Label::textColourId, juce::Colours::white);
         l.setJustificationType (juce::Justification::centred);
     };
@@ -341,7 +342,7 @@ void BlueSynthAudioProcessorEditor::paint (juce::Graphics& g)
 
     // Title
     g.setColour (juce::Colours::white);
-    g.setFont (juce::FontOptions (20.0f).withStyle ("Bold"));
+    g.setFont (appFont (20.0f));
     g.drawText ("BLUESYNTH", 0, 4, getWidth(), 24, juce::Justification::centred);
 
     // Master knob boxes (smaller: kBoxW × kBoxH)

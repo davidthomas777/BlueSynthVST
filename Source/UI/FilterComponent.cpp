@@ -10,6 +10,7 @@
 
 #include <JuceHeader.h>
 #include "FilterComponent.h"
+#include "AppFont.h"
 
 //==============================================================================
 FilterComponent::FilterComponent (juce::AudioProcessorValueTreeState& apvts,
@@ -40,7 +41,7 @@ void FilterComponent::paint (juce::Graphics& g)
     g.fillAll (juce::Colour (0xff4A90E2));
     g.setColour (juce::Colours::white);
     g.drawRect (getLocalBounds(), 1);
-    g.setFont (juce::FontOptions (12.0f).withStyle ("Bold"));
+    g.setFont (appFont (12.0f));
     g.drawText ("FILTER TYPE", getLocalBounds().reduced (8).withHeight (14), juce::Justification::centredLeft);
 }
 
@@ -91,7 +92,7 @@ void FilterComponent::setSliderWithLabel (juce::Slider& slider, juce::Label& lab
     attachment = std::make_unique<SliderAttachment> (apvts, paramId, slider);
 
     label.setColour (juce::Label::textColourId, juce::Colours::white);
-    label.setFont (juce::FontOptions (12.0f).withStyle ("Bold"));
+    label.setFont (appFont (12.0f));
     label.setJustificationType (juce::Justification::centred);
     addAndMakeVisible (label);
 }

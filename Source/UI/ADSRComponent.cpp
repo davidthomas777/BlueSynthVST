@@ -10,6 +10,7 @@
 
 #include <JuceHeader.h>
 #include "ADSRComponent.h"
+#include "AppFont.h"
 
 //==============================================================================
 ADSRComponent::ADSRComponent (juce::AudioProcessorValueTreeState& apvts,
@@ -43,7 +44,7 @@ void ADSRComponent::paint (juce::Graphics& g)
     g.drawRect (getLocalBounds(), 1);
 
     g.setColour (juce::Colours::white);
-    g.setFont (juce::FontOptions (12.0f).withStyle ("Bold"));
+    g.setFont (appFont (12.0f));
     g.drawText (titleText, getLocalBounds().reduced (8).withHeight (14), juce::Justification::centredLeft);
 }
 
@@ -87,7 +88,7 @@ void ADSRComponent::setSliderParams (juce::Slider& slider, juce::Label& label, c
     addAndMakeVisible (slider);
 
     label.setText (labelText, juce::dontSendNotification);
-    label.setFont (juce::FontOptions (12.0f).withStyle ("Bold"));
+    label.setFont (appFont (12.0f));
     label.setColour (juce::Label::textColourId, juce::Colours::white);
     label.setJustificationType (juce::Justification::centred);
     addAndMakeVisible (label);
