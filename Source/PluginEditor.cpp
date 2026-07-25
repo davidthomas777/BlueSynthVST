@@ -124,9 +124,14 @@ BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProc
     auto styleVisualiser = [](juce::AudioVisualiserComponent& v)
     {
         v.setColours (juce::Colour (0xff4A90E2), juce::Colours::white);
-        v.setRepaintRate (30);
+        // setBufferSize/setSamplesPerBlock must come before setRepaintRate: JUCE sizes
+        // its internal per-channel FIFO from the *current* samples-per-block value at
+        // the moment setRepaintRate() is called, not retroactively. Calling it first
+        // sizes that FIFO for the (much larger) default block size, causing it to
+        // silently drop most incoming audio once the real value is set.
         v.setBufferSize (256);
         v.setSamplesPerBlock (2);
+        v.setRepaintRate (30);
     };
     styleVisualiser (osc1Visualiser);
     styleVisualiser (osc2Visualiser);
