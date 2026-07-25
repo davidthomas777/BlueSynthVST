@@ -37,9 +37,9 @@ private:
     juce::Slider   resonanceSlider;
     juce::Slider   envAmtSlider;
 
-    juce::Label cutoffLabel    { "Cutoff",  "Cutoff" };
-    juce::Label resonanceLabel { "Res",     "Res" };
-    juce::Label envAmtLabel    { "Env Amt", "Env Amt" };
+    juce::Label cutoffLabel    { "Cutoff",  "CUTOFF" };
+    juce::Label resonanceLabel { "Res",     "RES" };
+    juce::Label envAmtLabel    { "Env Amt", "ENV AMT" };
 
     using SliderAttachment   = juce::AudioProcessorValueTreeState::SliderAttachment;
     using ComboBoxAttachment = juce::AudioProcessorValueTreeState::ComboBoxAttachment;

@@ -10,6 +10,7 @@
 
 #include <JuceHeader.h>
 #include "OscComponent.h"
+#include "AppFont.h"
 
 //==============================================================================
 OscComponent::OscComponent(juce::AudioProcessorValueTreeState& apvts,
@@ -73,7 +74,7 @@ void OscComponent::setSliderWithLabel (juce::Slider& slider, juce::Label& label,
     attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, paramId, slider);
     
     label.setColour (juce::Label::ColourIds::textColourId, juce::Colours::white);
-    label.setFont (juce::FontOptions (12.0f).withStyle ("Bold"));
+    label.setFont (appFont (12.0f));
     label.setJustificationType (juce::Justification::centred);
     addAndMakeVisible (label);
 }

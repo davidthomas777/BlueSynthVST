@@ -39,10 +39,10 @@ private:
     std::unique_ptr<Attachment> unisonVoicesAttachment;
     std::unique_ptr<Attachment> unisonDetuneAttachment;
 
-    juce::Label fmFreqLabel      { "FM Freq",  "FM Freq" };
-    juce::Label fmDepthLabel     { "FM Depth", "FM Depth" };
-    juce::Label unisonVoicesLabel { "Voices",   "Voices" };
-    juce::Label unisonDetuneLabel { "Detune",   "Detune" };
+    juce::Label fmFreqLabel      { "FM Freq",  "FM FREQ" };
+    juce::Label fmDepthLabel     { "FM Depth", "FM DEPTH" };
+    juce::Label unisonVoicesLabel { "Voices",   "VOICES" };
+    juce::Label unisonDetuneLabel { "Detune",   "DETUNE" };
     
     void setSliderWithLabel (juce::Slider& slider, juce::Label& label, juce::AudioProcessorValueTreeState& apvts, juce::String paramId, std::unique_ptr<Attachment>& attachment);
     
