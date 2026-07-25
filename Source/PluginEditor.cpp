@@ -16,16 +16,24 @@ static constexpr int kGap   = 20;    // gap between the two columns
 static constexpr int kCol1X = 240;   // left edge of osc 1 column
 static constexpr int kCol2X = kCol1X + kColW + kGap;  // = 560
 
-// Vertical positions
+// Vertical positions — each panel is derived from the previous one's bottom edge
+// plus a fixed gap, so inserting/reordering panels only requires touching one line.
+static constexpr int kGapY      = 8;    // vertical gap between stacked panels
 static constexpr int kPresetY   = 32;
-static constexpr int kToggleY   = 60;   // enable-button + gain/octave knob row (h=42)
+static constexpr int kToggleY   = 60;   // enable-button + gain/octave knob row
+static constexpr int kToggleH   = 42;
 static constexpr int kWaveY     = 106;  // wave-selector row
-static constexpr int kAdsrY     = 134;
-static constexpr int kFilterY   = 283;
-static constexpr int kFiltEnvY  = 444;
-static constexpr int kOscKnobY  = 593;
-static constexpr int kVisY      = kOscKnobY + 95 + 8;  // free band below the osc knob panel
+static constexpr int kWaveH     = 24;
+static constexpr int kVisY      = kWaveY + kWaveH + kGapY;    // oscilloscope, between wave selector and envelope
 static constexpr int kVisH      = 80;
+static constexpr int kAdsrY     = kVisY + kVisH + kGapY;
+static constexpr int kAdsrH     = 141;
+static constexpr int kFilterY   = kAdsrY + kAdsrH + kGapY;
+static constexpr int kFilterH   = 153;
+static constexpr int kFiltEnvY  = kFilterY + kFilterH + kGapY;
+static constexpr int kFiltEnvH  = 141;
+static constexpr int kOscKnobY  = kFiltEnvY + kFiltEnvH + kGapY;
+static constexpr int kOscKnobH  = 95;
 
 // Master-knob boxes (smaller than before: 70×70)
 static constexpr int kBoxW = 70;
@@ -283,9 +291,17 @@ BlueSynthAudioProcessorEditor::~BlueSynthAudioProcessorEditor()
     setLookAndFeel (nullptr);
 }
 
+// Visual-only gain applied before pushing to the scopes — actual output gain often
+// doesn't use the full ±1 range, which makes the trace look thinner than it should.
+// AudioVisualiserComponent's paint is clipped to its own bounds, so boosted peaks
+// just flatten at the edges rather than causing any drawing issue.
+static constexpr float kVisGain = 2.0f;
+
 void BlueSynthAudioProcessorEditor::timerCallback()
 {
     audioProcessor.drainVisualizerAudio (osc1VisScratch, osc2VisScratch);
+    osc1VisScratch.applyGain (kVisGain);
+    osc2VisScratch.applyGain (kVisGain);
     if (osc1VisScratch.getNumSamples() > 0) osc1Visualiser.pushBuffer (osc1VisScratch);
     if (osc2VisScratch.getNumSamples() > 0) osc2Visualiser.pushBuffer (osc2VisScratch);
 }
@@ -351,12 +367,12 @@ void BlueSynthAudioProcessorEditor::resized()
     osc1VolumeLabel  .setBounds (osc1GainPairX,               kToggleY, kLabelW, kVolKnobSize);
     osc1VolumeKnob   .setBounds (osc1GainPairX + kLabelW + kLabelGap, kToggleY, kVolKnobSize, kVolKnobSize);
 
-    oscWaveSelector  .setBounds (kCol1X, kWaveY,    kColW, 24);
-    adsr             .setBounds (kCol1X, kAdsrY,    kColW, 141);
-    filterComponent  .setBounds (kCol1X, kFilterY,  kColW, 153);
-    filterEnv        .setBounds (kCol1X, kFiltEnvY, kColW, 141);
-    osc              .setBounds (kCol1X, kOscKnobY, kColW, 95);
+    oscWaveSelector  .setBounds (kCol1X, kWaveY,    kColW, kWaveH);
     osc1Visualiser   .setBounds (kCol1X + 1, kVisY + 1, kColW - 2, kVisH - 2);
+    adsr             .setBounds (kCol1X, kAdsrY,    kColW, kAdsrH);
+    filterComponent  .setBounds (kCol1X, kFilterY,  kColW, kFilterH);
+    filterEnv        .setBounds (kCol1X, kFiltEnvY, kColW, kFiltEnvH);
+    osc              .setBounds (kCol1X, kOscKnobY, kColW, kOscKnobH);
 
     // ---- Osc 2 column ----
     osc2EnableButton .setBounds (kCol2X - 4, kToggleY, kToggleW, kVolKnobSize);
@@ -368,10 +384,10 @@ void BlueSynthAudioProcessorEditor::resized()
     osc2VolumeLabel  .setBounds (osc2GainPairX,               kToggleY, kLabelW, kVolKnobSize);
     osc2VolumeKnob   .setBounds (osc2GainPairX + kLabelW + kLabelGap, kToggleY, kVolKnobSize, kVolKnobSize);
 
-    osc2WaveSelector .setBounds (kCol2X, kWaveY,    kColW, 24);
-    adsr2            .setBounds (kCol2X, kAdsrY,    kColW, 141);
-    filterComponent2 .setBounds (kCol2X, kFilterY,  kColW, 153);
-    filterEnv2       .setBounds (kCol2X, kFiltEnvY, kColW, 141);
-    osc2             .setBounds (kCol2X, kOscKnobY, kColW, 95);
+    osc2WaveSelector .setBounds (kCol2X, kWaveY,    kColW, kWaveH);
     osc2Visualiser   .setBounds (kCol2X + 1, kVisY + 1, kColW - 2, kVisH - 2);
+    adsr2            .setBounds (kCol2X, kAdsrY,    kColW, kAdsrH);
+    filterComponent2 .setBounds (kCol2X, kFilterY,  kColW, kFilterH);
+    filterEnv2       .setBounds (kCol2X, kFiltEnvY, kColW, kFiltEnvH);
+    osc2             .setBounds (kCol2X, kOscKnobY, kColW, kOscKnobH);
 }
