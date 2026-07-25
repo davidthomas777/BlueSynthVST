@@ -1,6 +1,9 @@
 # macOS
 .DS_Store
 
+# Claude Code working directory (worktrees, plans, etc.)
+.claude/
+
 # JUCE Build files
 Builds/
 builds/
