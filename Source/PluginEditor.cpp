@@ -139,14 +139,14 @@ BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProc
         // silently drop most incoming audio once the real value is set.
         v.setBufferSize (256);
         v.setSamplesPerBlock (2);
-        v.setRepaintRate (30);
+        v.setRepaintRate (60);
     };
     styleVisualiser (osc1Visualiser);
     styleVisualiser (osc2Visualiser);
     addAndMakeVisible (osc1Visualiser);
     addAndMakeVisible (osc2Visualiser);
 
-    startTimerHz (30);
+    startTimerHz (60);
 
     auto styleKnob = [](juce::Slider& s) {
         s.setSliderStyle (juce::Slider::RotaryVerticalDrag);
