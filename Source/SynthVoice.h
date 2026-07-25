@@ -39,6 +39,7 @@ public:
     void updatePortamento (float time);
     void updatePitch      (float semitones);
     void updateOctave     (int octaves);
+    void updateOscPitch   (float semitones);
 
     // Visualizer tap targets (owned by the processor; nullptr = no-op)
     void setVisualizerTargets (VisualizerBuffer* osc1Target, VisualizerBuffer* osc2Target);
@@ -53,6 +54,7 @@ public:
     void updateFilter2    (float cutoff, float resonance, float envAmt, int type);
     void updateFilterEnv2 (float attack, float decay, float sustain, float release);
     void updateOctave2    (int octaves);
+    void updateOscPitch2  (float semitones);
 
 private:
     static constexpr int maxUnisonVoices = 8;
@@ -63,6 +65,7 @@ private:
     int   numUnisonVoices { 1 };
     float unisonDetune    { 0.0f };
     int   octave1         { 0 };
+    float oscPitch1       { 0.0f };  // per-oscillator semitone offset (whole numbers only)
 
     AdsrData   adsr;
     AdsrData   filterAdsr;
@@ -80,6 +83,7 @@ private:
     float unisonDetune2    { 0.0f };
     bool  osc2Enabled      { false };
     int   octave2          { 0 };
+    float oscPitch2        { 0.0f };  // per-oscillator semitone offset (whole numbers only)
 
     AdsrData   adsr2;
     AdsrData   filterAdsr2;

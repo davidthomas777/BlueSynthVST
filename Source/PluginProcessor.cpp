@@ -140,6 +140,7 @@ void BlueSynthAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
 
     const float osc1Gain   = apvts.getRawParameterValue ("OSC1GAIN")->load();
     const int   osc1Octave = static_cast<int> (apvts.getRawParameterValue ("OSC1OCTAVE")->load());
+    const float osc1Pitch  = apvts.getRawParameterValue ("OSC1PITCH")->load();
 
     // --- Osc 2 --- (fetched once per block: identical for every voice)
     const bool  osc2Enabled    = apvts.getRawParameterValue ("OSC2ENABLED")->load() >= 0.5f;
@@ -167,6 +168,7 @@ void BlueSynthAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
 
     const float osc2Gain   = apvts.getRawParameterValue ("OSC2GAIN")->load();
     const int   osc2Octave = static_cast<int> (apvts.getRawParameterValue ("OSC2OCTAVE")->load());
+    const float osc2Pitch  = apvts.getRawParameterValue ("OSC2PITCH")->load();
 
     // --- Change detection: only re-push wave type / ADSR params to voices when the
     //     source value actually changed since the last block (avoids redundant
@@ -186,6 +188,7 @@ void BlueSynthAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
             voice->setOsc1Enabled (osc1Enabled);
             voice->setOsc1Gain    (osc1Gain);
             voice->updateOctave   (osc1Octave);
+            voice->updateOscPitch (osc1Pitch);
             if (oscWaveChanged) voice->setOscWaveType (oscWaveChoice);
             voice->setOscFmParams   (fmDepth, fmFreq);
             voice->updateUnison     (unisonVoices, unisonDetune);
@@ -199,6 +202,7 @@ void BlueSynthAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
             voice->setOsc2Enabled (osc2Enabled);
             voice->setOsc2Gain    (osc2Gain);
             voice->updateOctave2  (osc2Octave);
+            voice->updateOscPitch2 (osc2Pitch);
             if (osc2WaveChanged) voice->setOsc2WaveType (osc2WaveChoice);
             voice->setOsc2FmParams  (fmDepth2, fmFreq2);
             voice->updateUnison2    (unisonVoices2, unisonDetune2);
@@ -276,6 +280,13 @@ juce::AudioProcessorValueTreeState::ParameterLayout BlueSynthAudioProcessor::cre
     params.push_back (std::make_unique<juce::AudioParameterBool>   ("OSC1ENABLED",  "Osc 1 Enabled", true));
     params.push_back (std::make_unique<juce::AudioParameterFloat>  ("OSC1GAIN", "Gain", juce::NormalisableRange<float> {0.0f, 1.0f, 0.01f}, 0.8f));
     params.push_back (std::make_unique<juce::AudioParameterInt>    ("OSC1OCTAVE", "Octave", -4, 4, 0));
+    {
+        juce::NormalisableRange<float> r (-24.0f, 24.0f,
+            [](float s,float e,float v){return s+v*(e-s);}, [](float s,float e,float v){return (v-s)/(e-s);},
+            [](float,float,float v)->float{return std::round(v);});
+        r.interval = 1.0f;
+        params.push_back (std::make_unique<juce::AudioParameterFloat> ("OSC1PITCH", "Osc 1 Pitch", r, 0.0f));
+    }
     params.push_back (std::make_unique<juce::AudioParameterChoice> ("OSC1WAVETYPE", "Osc 1 Wave Type",
         juce::StringArray {"Sine","Saw","Saw Inverse","Square","Triangle","Pulse 1","Pulse 2","Noise"}, 0));
     params.push_back (std::make_unique<juce::AudioParameterFloat> ("FMFREQ",  "FM Frequency", juce::NormalisableRange<float> {0.0f, 1000.0f, 0.01f, 0.3f}, 0.0f));
@@ -308,8 +319,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout BlueSynthAudioProcessor::cre
     {
         juce::NormalisableRange<float> r (-24.0f, 24.0f,
             [](float s,float e,float v){return s+v*(e-s);}, [](float s,float e,float v){return (v-s)/(e-s);},
-            [](float,float,float v)->float{return std::abs(v)<0.5f?0.0f:v;});
-        r.interval = 0.01f;
+            [](float,float,float v)->float{return std::round(v);});
+        r.interval = 1.0f;
         params.push_back (std::make_unique<juce::AudioParameterFloat> ("PITCH", "Pitch", r, 0.0f));
     }
     params.push_back (std::make_unique<juce::AudioParameterFloat> ("MASTERGAIN", "Master Gain", juce::NormalisableRange<float> {0.0f, 1.0f, 0.01f}, 0.5f));
@@ -318,6 +329,13 @@ juce::AudioProcessorValueTreeState::ParameterLayout BlueSynthAudioProcessor::cre
     params.push_back (std::make_unique<juce::AudioParameterBool>   ("OSC2ENABLED",  "Osc 2 Enabled", false));
     params.push_back (std::make_unique<juce::AudioParameterFloat>  ("OSC2GAIN", "Gain", juce::NormalisableRange<float> {0.0f, 1.0f, 0.01f}, 0.8f));
     params.push_back (std::make_unique<juce::AudioParameterInt>    ("OSC2OCTAVE", "Octave", -4, 4, 0));
+    {
+        juce::NormalisableRange<float> r (-24.0f, 24.0f,
+            [](float s,float e,float v){return s+v*(e-s);}, [](float s,float e,float v){return (v-s)/(e-s);},
+            [](float,float,float v)->float{return std::round(v);});
+        r.interval = 1.0f;
+        params.push_back (std::make_unique<juce::AudioParameterFloat> ("OSC2PITCH", "Osc 2 Pitch", r, 0.0f));
+    }
     params.push_back (std::make_unique<juce::AudioParameterChoice> ("OSC2WAVETYPE", "Osc 2 Wave Type",
         juce::StringArray {"Sine","Saw","Saw Inverse","Square","Triangle","Pulse 1","Pulse 2","Noise"}, 0));
     params.push_back (std::make_unique<juce::AudioParameterFloat> ("FMFREQ2",  "FM Frequency 2", juce::NormalisableRange<float> {0.0f, 1000.0f, 0.01f, 0.3f}, 0.0f));

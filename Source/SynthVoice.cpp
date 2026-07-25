@@ -133,6 +133,8 @@ void SynthVoice::updatePortamento (float time)      { portamentoTime       = tim
 void SynthVoice::updatePitch      (float semitones) { pitchOffsetSemitones = semitones; }
 void SynthVoice::updateOctave     (int octaves)      { octave1 = octaves; }
 void SynthVoice::updateOctave2    (int octaves)      { octave2 = octaves; }
+void SynthVoice::updateOscPitch   (float semitones)  { oscPitch1 = semitones; }
+void SynthVoice::updateOscPitch2  (float semitones)  { oscPitch2 = semitones; }
 void SynthVoice::setOsc1Enabled (bool enabled) { osc1Enabled = enabled; }
 void SynthVoice::setOsc2Enabled (bool enabled) { osc2Enabled = enabled; }
 void SynthVoice::setOsc1Gain    (float g)      { gain.setGainLinear  (g * 0.5f); }
@@ -141,8 +143,8 @@ void SynthVoice::setOsc2Gain    (float g)      { gain2.setGainLinear (g * 0.5f);
 void SynthVoice::updateOscFrequencies()
 {
     float pitchedHz  = currentHz * std::pow (2.0f, pitchOffsetSemitones / 12.0f);
-    float pitchedHz1 = pitchedHz * std::pow (2.0f, (float) octave1);
-    float pitchedHz2 = pitchedHz * std::pow (2.0f, (float) octave2);
+    float pitchedHz1 = pitchedHz * std::pow (2.0f, (float) octave1 + oscPitch1 / 12.0f);
+    float pitchedHz2 = pitchedHz * std::pow (2.0f, (float) octave2 + oscPitch2 / 12.0f);
 
     for (int i = 0; i < numUnisonVoices; ++i)
     {

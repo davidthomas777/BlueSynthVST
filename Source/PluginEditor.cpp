@@ -206,6 +206,20 @@ BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProc
     osc1VolumeLabel.setBorderSize (juce::BorderSize<int> (0));
     addAndMakeVisible (osc1VolumeLabel);
 
+    // ---- Osc 1 pitch knob ----
+    osc1PitchKnob.setSliderStyle (juce::Slider::RotaryVerticalDrag);
+    osc1PitchKnob.setTextBoxStyle (juce::Slider::NoTextBox, true, 0, 0);
+    osc1PitchKnob.setColour (juce::Slider::thumbColourId,               juce::Colours::white);
+    osc1PitchKnob.setColour (juce::Slider::rotarySliderFillColourId,    juce::Colours::white);
+    osc1PitchKnob.setColour (juce::Slider::rotarySliderOutlineColourId, juce::Colours::black);
+    osc1PitchKnob.setNumDecimalPlacesToDisplay (0);
+    osc1PitchAttachment = std::make_unique<SliderAttachment> (audioProcessor.apvts, "OSC1PITCH", osc1PitchKnob);
+    addAndMakeVisible (osc1PitchKnob);
+    styleLabel (osc1PitchLabel, "PITCH");
+    osc1PitchLabel.setJustificationType (juce::Justification::centredRight);
+    osc1PitchLabel.setBorderSize (juce::BorderSize<int> (0));
+    addAndMakeVisible (osc1PitchLabel);
+
     // ---- Osc 1 octave knob ----
     osc1OctaveKnob.setSliderStyle (juce::Slider::RotaryVerticalDrag);
     osc1OctaveKnob.setTextBoxStyle (juce::Slider::NoTextBox, true, 0, 0);
@@ -250,6 +264,20 @@ BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProc
     osc2VolumeLabel.setJustificationType (juce::Justification::centredRight);
     osc2VolumeLabel.setBorderSize (juce::BorderSize<int> (0));
     addAndMakeVisible (osc2VolumeLabel);
+
+    // ---- Osc 2 pitch knob ----
+    osc2PitchKnob.setSliderStyle (juce::Slider::RotaryVerticalDrag);
+    osc2PitchKnob.setTextBoxStyle (juce::Slider::NoTextBox, true, 0, 0);
+    osc2PitchKnob.setColour (juce::Slider::thumbColourId,               juce::Colours::white);
+    osc2PitchKnob.setColour (juce::Slider::rotarySliderFillColourId,    juce::Colours::white);
+    osc2PitchKnob.setColour (juce::Slider::rotarySliderOutlineColourId, juce::Colours::black);
+    osc2PitchKnob.setNumDecimalPlacesToDisplay (0);
+    osc2PitchAttachment = std::make_unique<SliderAttachment> (audioProcessor.apvts, "OSC2PITCH", osc2PitchKnob);
+    addAndMakeVisible (osc2PitchKnob);
+    styleLabel (osc2PitchLabel, "PITCH");
+    osc2PitchLabel.setJustificationType (juce::Justification::centredRight);
+    osc2PitchLabel.setBorderSize (juce::BorderSize<int> (0));
+    addAndMakeVisible (osc2PitchLabel);
 
     // ---- Osc 2 octave knob ----
     osc2OctaveKnob.setSliderStyle (juce::Slider::RotaryVerticalDrag);
@@ -349,10 +377,10 @@ void BlueSynthAudioProcessorEditor::resized()
     // Preset bar — spans both columns
     presetComponent.setBounds (kCol1X, kPresetY, kCol2X + kColW - kCol1X, 24);
 
-    const int kVolKnobSize = 42;  // square rotary, no text box
+    const int kVolKnobSize = 38;  // square rotary, no text box (shrunk from 42 to fit 3 pairs: Pitch, Oct, Gain)
     const int kToggleW    = 90;  // just wide enough for "OSC 1" + checkbox
-    const int kKnobGap    = 8;   // gap between the octave and gain knob pairs
-    const int kLabelW     = 24;  // "Oct"/"Gain" label, to the left of its knob
+    const int kKnobGap    = 8;   // gap between the pitch/octave/gain knob pairs
+    const int kLabelW     = 24;  // "Pitch"/"Oct"/"Gain" label, to the left of its knob
     const int kLabelGap   = 1;   // gap between label and its knob
     const int kPairW      = kLabelW + kLabelGap + kVolKnobSize;
 
@@ -360,8 +388,11 @@ void BlueSynthAudioProcessorEditor::resized()
     // Toggle shifted 4px left so its checkbox visually aligns with the combo box outline
     osc1EnableButton .setBounds (kCol1X - 4, kToggleY, kToggleW, kVolKnobSize);
 
-    const int osc1GainPairX = kCol1X + kColW - kPairW;
-    const int osc1OctPairX  = osc1GainPairX - kKnobGap - kPairW;
+    const int osc1GainPairX  = kCol1X + kColW - kPairW;
+    const int osc1OctPairX   = osc1GainPairX - kKnobGap - kPairW;
+    const int osc1PitchPairX = osc1OctPairX  - kKnobGap - kPairW;
+    osc1PitchLabel   .setBounds (osc1PitchPairX,             kToggleY, kLabelW, kVolKnobSize);
+    osc1PitchKnob    .setBounds (osc1PitchPairX + kLabelW + kLabelGap, kToggleY, kVolKnobSize, kVolKnobSize);
     osc1OctaveLabel  .setBounds (osc1OctPairX,               kToggleY, kLabelW, kVolKnobSize);
     osc1OctaveKnob   .setBounds (osc1OctPairX + kLabelW + kLabelGap, kToggleY, kVolKnobSize, kVolKnobSize);
     osc1VolumeLabel  .setBounds (osc1GainPairX,               kToggleY, kLabelW, kVolKnobSize);
@@ -377,8 +408,11 @@ void BlueSynthAudioProcessorEditor::resized()
     // ---- Osc 2 column ----
     osc2EnableButton .setBounds (kCol2X - 4, kToggleY, kToggleW, kVolKnobSize);
 
-    const int osc2GainPairX = kCol2X + kColW - kPairW;
-    const int osc2OctPairX  = osc2GainPairX - kKnobGap - kPairW;
+    const int osc2GainPairX  = kCol2X + kColW - kPairW;
+    const int osc2OctPairX   = osc2GainPairX - kKnobGap - kPairW;
+    const int osc2PitchPairX = osc2OctPairX  - kKnobGap - kPairW;
+    osc2PitchLabel   .setBounds (osc2PitchPairX,             kToggleY, kLabelW, kVolKnobSize);
+    osc2PitchKnob    .setBounds (osc2PitchPairX + kLabelW + kLabelGap, kToggleY, kVolKnobSize, kVolKnobSize);
     osc2OctaveLabel  .setBounds (osc2OctPairX,               kToggleY, kLabelW, kVolKnobSize);
     osc2OctaveKnob   .setBounds (osc2OctPairX + kLabelW + kLabelGap, kToggleY, kVolKnobSize, kVolKnobSize);
     osc2VolumeLabel  .setBounds (osc2GainPairX,               kToggleY, kLabelW, kVolKnobSize);
