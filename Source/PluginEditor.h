@@ -38,6 +38,32 @@ private:
                                juce::Slider&) override;
     };
 
+    // AudioVisualiserComponent's default paint fills a shape whose thickness is just
+    // the signal's peak-to-peak amplitude at each point, so quiet moments render as a
+    // near-invisible sliver. Stroking the same path's outline on top adds a constant
+    // minimum line weight regardless of amplitude.
+    struct OscilloscopeVisualiser : public juce::AudioVisualiserComponent
+    {
+        using juce::AudioVisualiserComponent::AudioVisualiserComponent;
+
+        void paintChannel (juce::Graphics& g, juce::Rectangle<float> area,
+                           const juce::Range<float>* levels, int numLevels, int nextSample) override
+        {
+            juce::Path p;
+            getChannelAsPath (p, levels, numLevels, nextSample);
+
+            auto transform = juce::AffineTransform::fromTargetPoints (
+                0.0f, -1.0f,              area.getX(), area.getY(),
+                0.0f, 1.0f,               area.getX(), area.getBottom(),
+                (float) numLevels, -1.0f, area.getRight(), area.getY());
+
+            g.fillPath (p, transform);
+
+            p.applyTransform (transform);
+            g.strokePath (p, juce::PathStrokeType (1.5f));
+        }
+    };
+
     DownwardComboLookAndFeel editorLookAndFeel;
 
     BlueSynthAudioProcessor& audioProcessor;
@@ -56,7 +82,7 @@ private:
     FilterComponent filterComponent;
     ADSRComponent   filterEnv;
     OscComponent    osc;
-    juce::AudioVisualiserComponent osc1Visualiser { 1 };
+    OscilloscopeVisualiser osc1Visualiser { 1 };
 
     // ---- Osc 2 ----
     juce::ToggleButton osc2EnableButton;
@@ -69,7 +95,7 @@ private:
     FilterComponent    filterComponent2;
     ADSRComponent      filterEnv2;
     OscComponent       osc2;
-    juce::AudioVisualiserComponent osc2Visualiser { 1 };
+    OscilloscopeVisualiser osc2Visualiser { 1 };
 
     // Scratch buffers the Timer copies processor snapshots into before pushing to the visualisers
     juce::AudioBuffer<float> osc1VisScratch;
