@@ -225,8 +225,23 @@ void BlueSynthAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
     synth.renderNextBlock (buffer, midiMessages, 0, buffer.getNumSamples());
     buffer.applyGain (apvts.getRawParameterValue ("MASTERGAIN")->load());
 
+    // Clip detection, on the real signal rather than the UI's gain-boosted display copy.
+    // The per-osc accumulators are still populated here (publishBlock only copies them
+    // into the ring buffer), and buffer is post-master-gain: what actually leaves the plugin.
+    constexpr float clipThreshold = 1.0f;
+    if (osc1Vis.getBlockMagnitude() >= clipThreshold)                  osc1Clipped.store   (true, std::memory_order_relaxed);
+    if (osc2Vis.getBlockMagnitude() >= clipThreshold)                  osc2Clipped.store   (true, std::memory_order_relaxed);
+    if (buffer.getMagnitude (0, buffer.getNumSamples()) >= clipThreshold) outputClipped.store (true, std::memory_order_relaxed);
+
     osc1Vis.publishBlock();
     osc2Vis.publishBlock();
+}
+
+BlueSynthAudioProcessor::ClipFlags BlueSynthAudioProcessor::fetchAndClearClipFlags()
+{
+    return { osc1Clipped  .exchange (false, std::memory_order_relaxed),
+             osc2Clipped  .exchange (false, std::memory_order_relaxed),
+             outputClipped.exchange (false, std::memory_order_relaxed) };
 }
 
 void BlueSynthAudioProcessor::drainVisualizerAudio (juce::AudioBuffer<float>& osc1Out, juce::AudioBuffer<float>& osc2Out)
@@ -278,7 +293,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout BlueSynthAudioProcessor::cre
 
     // ---- Osc 1 ----
     params.push_back (std::make_unique<juce::AudioParameterBool>   ("OSC1ENABLED",  "Osc 1 Enabled", true));
-    params.push_back (std::make_unique<juce::AudioParameterFloat>  ("OSC1GAIN", "Gain", juce::NormalisableRange<float> {0.0f, 1.0f, 0.01f}, 0.8f));
+    params.push_back (std::make_unique<juce::AudioParameterFloat>  ("OSC1GAIN", "Gain", juce::NormalisableRange<float> {0.0f, 1.0f, 0.01f}, 0.5f));
     params.push_back (std::make_unique<juce::AudioParameterInt>    ("OSC1OCTAVE", "Octave", -4, 4, 0));
     {
         juce::NormalisableRange<float> r (-24.0f, 24.0f,
@@ -327,7 +342,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout BlueSynthAudioProcessor::cre
 
     // ---- Osc 2 ----
     params.push_back (std::make_unique<juce::AudioParameterBool>   ("OSC2ENABLED",  "Osc 2 Enabled", false));
-    params.push_back (std::make_unique<juce::AudioParameterFloat>  ("OSC2GAIN", "Gain", juce::NormalisableRange<float> {0.0f, 1.0f, 0.01f}, 0.8f));
+    params.push_back (std::make_unique<juce::AudioParameterFloat>  ("OSC2GAIN", "Gain", juce::NormalisableRange<float> {0.0f, 1.0f, 0.01f}, 0.5f));
     params.push_back (std::make_unique<juce::AudioParameterInt>    ("OSC2OCTAVE", "Octave", -4, 4, 0));
     {
         juce::NormalisableRange<float> r (-24.0f, 24.0f,

@@ -105,6 +105,22 @@ private:
     juce::AudioBuffer<float> osc1VisScratch;
     juce::AudioBuffer<float> osc2VisScratch;
 
+    // Scope outline severity. Two tiers rather than one, because "this oscillator has run
+    // out of headroom" and "the plugin's output is actually clipping" are different problems
+    // with different fixes, and nothing in the float signal path clamps at full scale — a
+    // maxed oscillator has not lost anything yet, so it doesn't warrant the same alarm as a
+    // genuine output clip.
+    enum class ScopeState { normal, hot, clipping };
+
+    ScopeState osc1ScopeState { ScopeState::normal };
+    ScopeState osc2ScopeState { ScopeState::normal };
+
+    // Timer ticks remaining on each condition. A clip can last a single sample, which at
+    // 60Hz would otherwise be an invisible one-frame flash.
+    int osc1HotHold    { 0 };
+    int osc2HotHold    { 0 };
+    int outputClipHold { 0 };
+
     // ---- Master knobs ----
     juce::Slider gainSlider;
     juce::Label  gainLabel;
