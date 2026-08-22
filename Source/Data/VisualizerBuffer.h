@@ -38,6 +38,10 @@ public:
     // Audio thread: call once after all voices have rendered, to append this block to the ring buffer
     void publishBlock();
 
+    // Audio thread: peak absolute sample of the current block's accumulated signal.
+    // Valid between prepareBlock() and the next prepareBlock(); used for clip detection.
+    float getBlockMagnitude() const;
+
     // UI thread: pulls everything accumulated since the last call into out (may be 0 samples)
     void drain (juce::AudioBuffer<float>& out);
 

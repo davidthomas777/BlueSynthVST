@@ -64,6 +64,14 @@ public:
     // to call from the message thread while processBlock runs on the audio thread.
     void drainVisualizerAudio (juce::AudioBuffer<float>& osc1Out, juce::AudioBuffer<float>& osc2Out);
 
+    // Whether each oscillator's own signal, and the final post-master-gain output, hit
+    // full scale at any point since the flags were last read.
+    struct ClipFlags { bool osc1, osc2, output; };
+
+    // UI thread: returns the latched flags and clears them. The audio thread only ever
+    // latches them true, so a clip between two calls can never be missed.
+    ClipFlags fetchAndClearClipFlags();
+
 private:
     juce::Synthesiser synth;
     juce::AudioProcessorValueTreeState::ParameterLayout createParameters();
@@ -71,6 +79,11 @@ private:
     // --- Oscilloscope tap buffers: all-voices-summed, mono, per oscillator ---
     VisualizerBuffer osc1Vis;
     VisualizerBuffer osc2Vis;
+
+    // --- Clip indicators: latched by the audio thread, cleared by the UI ---
+    std::atomic<bool> osc1Clipped   { false };
+    std::atomic<bool> osc2Clipped   { false };
+    std::atomic<bool> outputClipped { false };
 
     // --- Change-detection cache: avoids re-pushing wave type / ADSR params to every
     //     voice every block when the underlying parameter hasn't actually changed ---

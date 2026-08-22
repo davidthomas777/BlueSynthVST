@@ -320,19 +320,74 @@ BlueSynthAudioProcessorEditor::~BlueSynthAudioProcessorEditor()
     setLookAndFeel (nullptr);
 }
 
-// Visual-only gain applied before pushing to the scopes — actual output gain often
-// doesn't use the full ±1 range, which makes the trace look thinner than it should.
-// AudioVisualiserComponent's paint is clipped to its own bounds, so boosted peaks
-// just flatten at the edges rather than causing any drawing issue.
-static constexpr float kVisGain = 2.0f;
+// Visual-only waveshaping applied before pushing to the scopes — actual output gain often
+// doesn't use the full ±1 range, which makes the trace look thinner than it should. A plain
+// linear boost fixes that but saturates the drawing well before the signal actually clips,
+// so a flattened trace stops carrying any information and disagrees with the clip outline.
+//
+// tanh (k·x) / tanh (k) is monotonic, keeps roughly the old 2× slope near zero so quiet
+// playing stays just as visible, and reaches the edge of the box only at true full scale.
+// A flat trace and a red outline now mean the same thing, and approaching the limit shows
+// up as visible compression toward the edges instead of an abrupt flat-top.
+static constexpr float kVisShape = 1.915f;   // slope at 0 is k / tanh(k) ≈ 2.0, the old linear gain
+static const     float kVisNorm  = 1.0f / std::tanh (kVisShape);
+
+static void applyVisualiserShaping (juce::AudioBuffer<float>& b)
+{
+    const int numSamples = b.getNumSamples();
+    if (numSamples <= 0)
+        return;
+
+    auto* samples = b.getWritePointer (0);
+    for (int i = 0; i < numSamples; ++i)
+        samples[i] = kVisNorm * std::tanh (kVisShape * samples[i]);
+}
+
+// How long a scope outline stays lit after a clip, in timer ticks (~1s at 60Hz).
+static constexpr int kClipHoldTicks = 60;
+
+// Amber reads as clearly distinct from both white and red against the blue panel.
+static const juce::Colour kHotOutline { 0xffffb020 };
 
 void BlueSynthAudioProcessorEditor::timerCallback()
 {
     audioProcessor.drainVisualizerAudio (osc1VisScratch, osc2VisScratch);
-    osc1VisScratch.applyGain (kVisGain);
-    osc2VisScratch.applyGain (kVisGain);
+    applyVisualiserShaping (osc1VisScratch);
+    applyVisualiserShaping (osc2VisScratch);
     if (osc1VisScratch.getNumSamples() > 0) osc1Visualiser.pushBuffer (osc1VisScratch);
     if (osc2VisScratch.getNumSamples() > 0) osc2Visualiser.pushBuffer (osc2VisScratch);
+
+    const auto clip = audioProcessor.fetchAndClearClipFlags();
+
+    auto advanceHold = [] (int& hold, bool triggered)
+    {
+        if (triggered)     hold = kClipHoldTicks;
+        else if (hold > 0) --hold;
+    };
+    advanceHold (osc1HotHold,    clip.osc1);
+    advanceHold (osc2HotHold,    clip.osc2);
+    advanceHold (outputClipHold, clip.output);
+
+    const bool osc1On = audioProcessor.apvts.getRawParameterValue ("OSC1ENABLED")->load() > 0.5f;
+    const bool osc2On = audioProcessor.apvts.getRawParameterValue ("OSC2ENABLED")->load() > 0.5f;
+
+    // A real output clip outranks a merely maxed-out oscillator, and marks only the
+    // oscillators actually feeding the output — reddening a silent osc's scope because the
+    // *other* one overflowed would point at the wrong thing.
+    auto stateFor = [this] (int hotHold, bool enabled)
+    {
+        if (outputClipHold > 0 && enabled) return ScopeState::clipping;
+        if (hotHold > 0)                   return ScopeState::hot;
+        return ScopeState::normal;
+    };
+
+    const auto newState1 = stateFor (osc1HotHold, osc1On);
+    const auto newState2 = stateFor (osc2HotHold, osc2On);
+
+    // Repaint only on a state change: paint() redraws the whole background, so repainting
+    // these rects every tick would be wasted work at 60Hz.
+    if (newState1 != osc1ScopeState) { osc1ScopeState = newState1; repaint (kCol1X, kVisY, kColW, kVisH); }
+    if (newState2 != osc2ScopeState) { osc2ScopeState = newState2; repaint (kCol2X, kVisY, kColW, kVisH); }
 }
 
 //==============================================================================
@@ -353,8 +408,24 @@ void BlueSynthAudioProcessorEditor::paint (juce::Graphics& g)
     g.drawRect (juce::Rectangle<int> (box2X, kBoxY, kBoxW, kBoxH), 1);
     g.drawRect (juce::Rectangle<int> (box1X, kBoxY, kBoxW, kBoxH), 1);
 
-    // Oscilloscope panel outlines — visible even when idle/silent
+    // Oscilloscope panel outlines — visible even when idle/silent, amber when that
+    // oscillator has run out of headroom, red when the output itself is clipping.
+    // Kept at 1px: the visualisers sit inset by exactly that much, so a thicker stroke
+    // would cover the outer edge of the trace.
+    auto outlineColour = [] (ScopeState state)
+    {
+        switch (state)
+        {
+            case ScopeState::clipping: return juce::Colours::red;
+            case ScopeState::hot:      return kHotOutline;
+            case ScopeState::normal:
+            default:                   return juce::Colours::white;
+        }
+    };
+
+    g.setColour (outlineColour (osc1ScopeState));
     g.drawRect (juce::Rectangle<int> (kCol1X, kVisY, kColW, kVisH), 1);
+    g.setColour (outlineColour (osc2ScopeState));
     g.drawRect (juce::Rectangle<int> (kCol2X, kVisY, kColW, kVisH), 1);
 }
 

@@ -48,6 +48,12 @@ void VisualizerBuffer::publishBlock()
     fifo.finishedWrite (size1 + size2);
 }
 
+float VisualizerBuffer::getBlockMagnitude() const
+{
+    const int numSamples = accumBuffer.getNumSamples();
+    return numSamples > 0 ? accumBuffer.getMagnitude (0, 0, numSamples) : 0.0f;
+}
+
 void VisualizerBuffer::drain (juce::AudioBuffer<float>& out)
 {
     const int numReady = fifo.getNumReady();

@@ -12,6 +12,20 @@
 
 std::atomic<float> SynthVoice::lastPlayedHz { 0.0f };
 
+// Upper limit of the filter cutoff range. At this setting a low-pass is meant to be
+// "off", but the filter is still a 2-pole IIR: fed the instantaneous edges of a square
+// it overshoots ~29% and rings for ~15 samples, because 20kHz sits at 91% of Nyquist
+// at 44.1kHz where the TPT topology is badly frequency-warped. So a wide-open low-pass
+// is skipped outright rather than run — see filterIsBypassed().
+static constexpr float kFilterCutoffMax = 20000.0f;
+
+// Only a *low-pass* is transparent when opened all the way; a high-pass or band-pass
+// parked at 20kHz is doing very real work and must stay in the path.
+static inline bool filterIsBypassed (int filterType, float cutoff)
+{
+    return filterType == 0 && cutoff >= kFilterCutoffMax;
+}
+
 bool SynthVoice::canPlaySound (juce::SynthesiserSound* sound) {
     return dynamic_cast<juce::SynthesiserSound*>(sound) != nullptr;
 }
@@ -251,7 +265,13 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer, int st
         for (int s = 0; s < synthBuffer.getNumSamples(); ++s)
         {
             float env    = filterAdsr.getNextSample();
-            float cutoff = juce::jlimit (20.0f, 20000.0f, filterCutoff + env * filterEnvAmt * 20000.0f);
+            float cutoff = juce::jlimit (20.0f, kFilterCutoffMax, filterCutoff + env * filterEnvAmt * kFilterCutoffMax);
+
+            // The envelope still has to advance every sample even when nothing is filtered,
+            // or the filter env would freeze while the cutoff sits at the ceiling.
+            if (filterIsBypassed (filterType, cutoff))
+                continue;
+
             if (cutoff != lastAppliedCutoff || filterRes != lastAppliedRes || filterType != lastAppliedType)
             {
                 filter.updateParams (cutoff, filterRes, filterType);
@@ -291,7 +311,11 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer, int st
         for (int s = 0; s < osc2Buffer.getNumSamples(); ++s)
         {
             float env    = filterAdsr2.getNextSample();
-            float cutoff = juce::jlimit (20.0f, 20000.0f, filterCutoff2 + env * filterEnvAmt2 * 20000.0f);
+            float cutoff = juce::jlimit (20.0f, kFilterCutoffMax, filterCutoff2 + env * filterEnvAmt2 * kFilterCutoffMax);
+
+            if (filterIsBypassed (filterType2, cutoff))
+                continue;
+
             if (cutoff != lastAppliedCutoff2 || filterRes2 != lastAppliedRes2 || filterType2 != lastAppliedType2)
             {
                 filter2.updateParams (cutoff, filterRes2, filterType2);
