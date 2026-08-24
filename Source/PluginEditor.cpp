@@ -130,20 +130,8 @@ BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProc
     setLookAndFeel (&editorLookAndFeel);
     setSize (1100, 786);
 
-    auto styleVisualiser = [](juce::AudioVisualiserComponent& v)
-    {
-        v.setColours (juce::Colour (0xff4A90E2), juce::Colours::white);
-        // setBufferSize/setSamplesPerBlock must come before setRepaintRate: JUCE sizes
-        // its internal per-channel FIFO from the *current* samples-per-block value at
-        // the moment setRepaintRate() is called, not retroactively. Calling it first
-        // sizes that FIFO for the (much larger) default block size, causing it to
-        // silently drop most incoming audio once the real value is set.
-        v.setBufferSize (256);
-        v.setSamplesPerBlock (2);
-        v.setRepaintRate (60);
-    };
-    styleVisualiser (osc1Visualiser);
-    styleVisualiser (osc2Visualiser);
+    // OscilloscopeComponent sizes its own window from the played pitch and is repainted by
+    // the timer below, so there is nothing to configure here.
     addAndMakeVisible (osc1Visualiser);
     addAndMakeVisible (osc2Visualiser);
 
@@ -354,8 +342,16 @@ void BlueSynthAudioProcessorEditor::timerCallback()
     audioProcessor.drainVisualizerAudio (osc1VisScratch, osc2VisScratch);
     applyVisualiserShaping (osc1VisScratch);
     applyVisualiserShaping (osc2VisScratch);
-    if (osc1VisScratch.getNumSamples() > 0) osc1Visualiser.pushBuffer (osc1VisScratch);
-    if (osc2VisScratch.getNumSamples() > 0) osc2Visualiser.pushBuffer (osc2VisScratch);
+    osc1Visualiser.pushBuffer (osc1VisScratch);
+    osc2Visualiser.pushBuffer (osc2VisScratch);
+
+    // Feeding the scopes the pitch on screen is what keeps the waveform the same size across
+    // octave changes; the component owns no timer, so repaint has to be driven from here too.
+    const double sr = audioProcessor.getSampleRate();
+    osc1Visualiser.setDisplayFrequency (audioProcessor.getOsc1DisplayHz(), sr);
+    osc2Visualiser.setDisplayFrequency (audioProcessor.getOsc2DisplayHz(), sr);
+    osc1Visualiser.repaint();
+    osc2Visualiser.repaint();
 
     const auto clip = audioProcessor.fetchAndClearClipFlags();
 

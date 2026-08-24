@@ -11,6 +11,9 @@
 #include "SynthVoice.h"
 
 std::atomic<float> SynthVoice::lastPlayedHz { 0.0f };
+std::atomic<SynthVoice*> SynthVoice::displayVoice { nullptr };
+std::atomic<float> SynthVoice::lastOsc1Hz { 0.0f };
+std::atomic<float> SynthVoice::lastOsc2Hz { 0.0f };
 
 // Upper limit of the filter cutoff range. At this setting a low-pass is meant to be
 // "off", but the filter is still a 2-pole IIR: fed the instantaneous edges of a square
@@ -38,12 +41,15 @@ void SynthVoice::startNote (int midiNoteNumber, float velocity, juce::Synthesise
     else
         currentHz = targetHz;
     lastPlayedHz.store (targetHz);
+    noteHeld = true;
+    displayVoice.store (this, std::memory_order_relaxed);   // newest note claims the scope
     updateOscFrequencies();
     adsr.noteOn();  filterAdsr.noteOn();
     adsr2.noteOn(); filterAdsr2.noteOn();
 }
 
 void SynthVoice::stopNote (float velocity, bool allowTailOff) {
+    noteHeld = false;
     adsr.noteOff();  filterAdsr.noteOff();
     adsr2.noteOff(); filterAdsr2.noteOff();
 
@@ -137,10 +143,13 @@ void SynthVoice::updateUnison2 (int numVoices, float detune) {
     unisonDetune2    = detune;
 }
 
-void SynthVoice::setVisualizerTargets (VisualizerBuffer* osc1Target, VisualizerBuffer* osc2Target)
+void SynthVoice::setVisualizerTargets (VisualizerBuffer* osc1Target,        VisualizerBuffer* osc2Target,
+                                       VisualizerBuffer* osc1DisplayTarget, VisualizerBuffer* osc2DisplayTarget)
 {
     osc1VisTarget = osc1Target;
     osc2VisTarget = osc2Target;
+    osc1DisplayVisTarget = osc1DisplayTarget;
+    osc2DisplayVisTarget = osc2DisplayTarget;
 }
 
 void SynthVoice::updatePortamento (float time)      { portamentoTime       = time; }
@@ -159,6 +168,13 @@ void SynthVoice::updateOscFrequencies()
     float pitchedHz  = currentHz * std::pow (2.0f, pitchOffsetSemitones / 12.0f);
     float pitchedHz1 = pitchedHz * std::pow (2.0f, (float) octave1 + oscPitch1 / 12.0f);
     float pitchedHz2 = pitchedHz * std::pow (2.0f, (float) octave2 + oscPitch2 / 12.0f);
+
+    // Runs every block, so the scope picks up octave and pitch changes immediately.
+    if (isDisplayVoice())
+    {
+        lastOsc1Hz.store (pitchedHz1, std::memory_order_relaxed);
+        lastOsc2Hz.store (pitchedHz2, std::memory_order_relaxed);
+    }
 
     for (int i = 0; i < numUnisonVoices; ++i)
     {
@@ -235,6 +251,23 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer, int st
     if (!isVoiceActive())
         return;
 
+    // Take over the scope if whichever voice owns it can no longer drive it: it has finished
+    // entirely, or it has been released while this one is still held. Without this, releasing
+    // the newest note of a chord leaves the display pointed at a dead voice and the trace goes
+    // flat even though other notes are still sounding.
+    //
+    // Safe to inspect another voice here: the Synthesiser renders every voice sequentially on
+    // the audio thread, so no other voice is mid-update while this runs.
+    if (auto* owner = displayVoice.load (std::memory_order_relaxed))
+    {
+        if (! owner->isVoiceActive() || (! owner->noteHeld && noteHeld))
+            displayVoice.store (this, std::memory_order_relaxed);
+    }
+    else
+    {
+        displayVoice.store (this, std::memory_order_relaxed);
+    }
+
     // ---- Portamento ----
     if (portamentoTime > 0.001f)
     {
@@ -287,6 +320,9 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer, int st
 
         if (osc1VisTarget != nullptr)
             osc1VisTarget->addFrom (startSample, synthBuffer, numSamples);
+
+        if (osc1DisplayVisTarget != nullptr && isDisplayVoice())
+            osc1DisplayVisTarget->addFrom (startSample, synthBuffer, numSamples);
     }
     else
     {
@@ -331,6 +367,9 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer, int st
 
         if (osc2VisTarget != nullptr)
             osc2VisTarget->addFrom (startSample, osc2Buffer, numSamples);
+
+        if (osc2DisplayVisTarget != nullptr && isDisplayVoice())
+            osc2DisplayVisTarget->addFrom (startSample, osc2Buffer, numSamples);
 
         // Mix osc2 into osc1
         for (int ch = 0; ch < synthBuffer.getNumChannels(); ++ch)

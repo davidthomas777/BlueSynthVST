@@ -28,7 +28,7 @@ BlueSynthAudioProcessor::BlueSynthAudioProcessor()
     for (int i = 0; i < 32; ++i)
     {
         auto* voice = new SynthVoice();
-        voice->setVisualizerTargets (&osc1Vis, &osc2Vis);
+        voice->setVisualizerTargets (&osc1Vis, &osc2Vis, &osc1Display, &osc2Display);
         synth.addVoice (voice);
     }
 }
@@ -78,8 +78,11 @@ void BlueSynthAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBl
         if (auto voice = dynamic_cast<SynthVoice*>(synth.getVoice(i)))
             voice->prepareToPlay (sampleRate, samplesPerBlock, getTotalNumOutputChannels());
 
-    osc1Vis.prepare (samplesPerBlock, sampleRate);
-    osc2Vis.prepare (samplesPerBlock, sampleRate);
+    const int numOutputChannels = getTotalNumOutputChannels();
+    osc1Vis.prepare (samplesPerBlock, sampleRate, numOutputChannels);
+    osc2Vis.prepare (samplesPerBlock, sampleRate, numOutputChannels);
+    osc1Display.prepare (samplesPerBlock, sampleRate, numOutputChannels);
+    osc2Display.prepare (samplesPerBlock, sampleRate, numOutputChannels);
 }
 
 void BlueSynthAudioProcessor::releaseResources() {}
@@ -221,6 +224,8 @@ void BlueSynthAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
 
     osc1Vis.prepareBlock (buffer.getNumSamples());
     osc2Vis.prepareBlock (buffer.getNumSamples());
+    osc1Display.prepareBlock (buffer.getNumSamples());
+    osc2Display.prepareBlock (buffer.getNumSamples());
 
     synth.renderNextBlock (buffer, midiMessages, 0, buffer.getNumSamples());
     buffer.applyGain (apvts.getRawParameterValue ("MASTERGAIN")->load());
@@ -233,8 +238,10 @@ void BlueSynthAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
     if (osc2Vis.getBlockMagnitude() >= clipThreshold)                  osc2Clipped.store   (true, std::memory_order_relaxed);
     if (buffer.getMagnitude (0, buffer.getNumSamples()) >= clipThreshold) outputClipped.store (true, std::memory_order_relaxed);
 
-    osc1Vis.publishBlock();
-    osc2Vis.publishBlock();
+    // Only the display taps are drained by the UI; the summed pair above exists purely to be
+    // peak-read for clipping, so it never needs to reach the ring buffer.
+    osc1Display.publishBlock();
+    osc2Display.publishBlock();
 }
 
 BlueSynthAudioProcessor::ClipFlags BlueSynthAudioProcessor::fetchAndClearClipFlags()
@@ -246,9 +253,12 @@ BlueSynthAudioProcessor::ClipFlags BlueSynthAudioProcessor::fetchAndClearClipFla
 
 void BlueSynthAudioProcessor::drainVisualizerAudio (juce::AudioBuffer<float>& osc1Out, juce::AudioBuffer<float>& osc2Out)
 {
-    osc1Vis.drain (osc1Out);
-    osc2Vis.drain (osc2Out);
+    osc1Display.drain (osc1Out);
+    osc2Display.drain (osc2Out);
 }
+
+float BlueSynthAudioProcessor::getOsc1DisplayHz() const { return SynthVoice::getOsc1DisplayHz(); }
+float BlueSynthAudioProcessor::getOsc2DisplayHz() const { return SynthVoice::getOsc2DisplayHz(); }
 
 //==============================================================================
 bool BlueSynthAudioProcessor::hasEditor() const { return true; }
