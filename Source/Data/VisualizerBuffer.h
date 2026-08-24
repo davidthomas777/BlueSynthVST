@@ -27,18 +27,18 @@
 class VisualizerBuffer
 {
 public:
-    void prepare (int samplesPerBlock, double sampleRate);
+    void prepare (int samplesPerBlock, double sampleRate, int numChannels);
 
     // Audio thread: call once at the top of each processBlock, before voices render
     void prepareBlock (int numSamples);
 
-    // Audio thread: add a voice's contribution (channel 0 of source) at the given block offset
+    // Audio thread: add a voice's contribution (all channels) at the given block offset
     void addFrom (int startSample, const juce::AudioBuffer<float>& source, int numSamplesToAdd);
 
     // Audio thread: call once after all voices have rendered, to append this block to the ring buffer
     void publishBlock();
 
-    // Audio thread: peak absolute sample of the current block's accumulated signal.
+    // Audio thread: peak absolute sample of the current block, across all channels.
     // Valid between prepareBlock() and the next prepareBlock(); used for clip detection.
     float getBlockMagnitude() const;
 
@@ -47,6 +47,8 @@ public:
 
 private:
     juce::AudioBuffer<float> accumBuffer;
+    int accumChannels { 1 };
+    std::vector<float> monoScratch;   // channel fold-down, reused to avoid per-block allocation
 
     juce::AbstractFifo fifo { 1 };
     std::vector<float> fifoStorage;

@@ -41,8 +41,18 @@ public:
     void updateOctave     (int octaves);
     void updateOscPitch   (float semitones);
 
-    // Visualizer tap targets (owned by the processor; nullptr = no-op)
-    void setVisualizerTargets (VisualizerBuffer* osc1Target, VisualizerBuffer* osc2Target);
+    // Visualizer tap targets (owned by the processor; nullptr = no-op).
+    // The "vis" pair receives every voice summed — that is what reaches the output, so it is
+    // what clip detection has to measure. The "display" pair receives only the voice currently
+    // driving the scope; a chord's notes are irrational multiples of each other in equal
+    // temperament, so their sum never repeats and no amount of triggering can hold it still.
+    void setVisualizerTargets (VisualizerBuffer* osc1Target,        VisualizerBuffer* osc2Target,
+                               VisualizerBuffer* osc1DisplayTarget, VisualizerBuffer* osc2DisplayTarget);
+
+    // Frequency of each oscillator in the voice currently driving the scope, so the display can
+    // size its window to the pitch actually on screen. 0 until the first note is played.
+    static float getOsc1DisplayHz() { return lastOsc1Hz.load (std::memory_order_relaxed); }
+    static float getOsc2DisplayHz() { return lastOsc2Hz.load (std::memory_order_relaxed); }
 
     // Osc 2
     void setOsc2Enabled   (bool enabled);
@@ -119,9 +129,24 @@ private:
 
     static std::atomic<float> lastPlayedHz;
 
+    // The most recently triggered voice owns the scope. Driving both the display audio and the
+    // published pitch from one place guarantees the window size and the waveform can never come
+    // from different notes.
+    static std::atomic<SynthVoice*> displayVoice;
+    static std::atomic<float> lastOsc1Hz;
+    static std::atomic<float> lastOsc2Hz;
+
+    bool isDisplayVoice() const { return displayVoice.load (std::memory_order_relaxed) == this; }
+
+    // True between noteOn and noteOff. Distinguishes a held note from one in its release tail,
+    // so the scope can hand off from a released voice to one still being played.
+    bool noteHeld { false };
+
     bool isPrepared { false };
 
     // --- Visualizer tap targets ---
     VisualizerBuffer* osc1VisTarget { nullptr };
     VisualizerBuffer* osc2VisTarget { nullptr };
+    VisualizerBuffer* osc1DisplayVisTarget { nullptr };
+    VisualizerBuffer* osc2DisplayVisTarget { nullptr };
 };

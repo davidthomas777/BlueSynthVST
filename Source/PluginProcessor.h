@@ -72,13 +72,26 @@ public:
     // latches them true, so a clip between two calls can never be missed.
     ClipFlags fetchAndClearClipFlags();
 
+    // Frequency of each oscillator in the voice currently on the scope, so the display can
+    // size its window to the pitch on screen. 0 until the first note is played.
+    // Defined in the .cpp to keep SynthVoice out of this header.
+    float getOsc1DisplayHz() const;
+    float getOsc2DisplayHz() const;
+
 private:
     juce::Synthesiser synth;
     juce::AudioProcessorValueTreeState::ParameterLayout createParameters();
 
-    // --- Oscilloscope tap buffers: all-voices-summed, mono, per oscillator ---
+    // --- Clip-detection taps: all-voices-summed, mono, per oscillator. Never drained;
+    //     only peak-read via getBlockMagnitude(), since clipping is about what reaches
+    //     the output, which is every voice added together. ---
     VisualizerBuffer osc1Vis;
     VisualizerBuffer osc2Vis;
+
+    // --- Oscilloscope taps: the single voice currently driving the display. A chord's
+    //     summed waveform never repeats, so only one voice can be held steady on screen. ---
+    VisualizerBuffer osc1Display;
+    VisualizerBuffer osc2Display;
 
     // --- Clip indicators: latched by the audio thread, cleared by the UI ---
     std::atomic<bool> osc1Clipped   { false };
