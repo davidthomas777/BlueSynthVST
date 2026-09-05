@@ -36,7 +36,7 @@ public:
     // Editor's 60Hz timer pushes the selected filter's current values through here,
     // plus its actual live cutoff (CUTOFF plus whatever the filter envelope is adding)
     // for the curve's live dot.
-    void updateCurve (int filterType, float cutoffHz, float resonance, float liveCutoffHz);
+    void updateCurve (int filterType, float cutoffHz, float resonance, float liveCutoffHz, double sampleRate);
 
     void paint (juce::Graphics&) override;
     void resized() override;

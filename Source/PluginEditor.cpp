@@ -420,7 +420,7 @@ void BlueSynthAudioProcessorEditor::timerCallback()
         filterPanel.updateCurve ((int) raw (second ? "FILTERTYPE2"   : "FILTERTYPE"),
                                        raw (second ? "FILTERCUTOFF2" : "FILTERCUTOFF"),
                                        raw (second ? "FILTERRES2"    : "FILTERRES"),
-                                       liveCutoff);
+                                       liveCutoff, sr);
     }
 
     const auto clip = audioProcessor.fetchAndClearClipFlags();
