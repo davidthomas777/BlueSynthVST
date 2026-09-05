@@ -82,9 +82,9 @@ void FilterPanelComponent::selectFilter (int index)
     styleTab (filter2Tab, ! showA);
 }
 
-void FilterPanelComponent::updateCurve (int filterType, float cutoffHz, float resonance, float liveCutoffHz)
+void FilterPanelComponent::updateCurve (int filterType, float cutoffHz, float resonance, float liveCutoffHz, double sampleRate)
 {
-    curveDisplay.setParams (filterType, cutoffHz, resonance);
+    curveDisplay.setParams (filterType, cutoffHz, resonance, sampleRate);
     curveDisplay.setLiveCutoff (liveCutoffHz);
 }
 
