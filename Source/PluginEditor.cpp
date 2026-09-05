@@ -29,18 +29,30 @@ static constexpr int kVisY      = kWaveY + kWaveH + kGapY;    // oscilloscope, b
 static constexpr int kVisH      = 80;
 static constexpr int kAdsrY     = kVisY + kVisH + kGapY;
 static constexpr int kAdsrH     = 141;
-static constexpr int kFilterY   = kAdsrY + kAdsrH + kGapY;
-static constexpr int kFilterH   = 153;
-static constexpr int kFiltEnvY  = kFilterY + kFilterH + kGapY;
-static constexpr int kFiltEnvH  = 141;
-static constexpr int kOscKnobY  = kFiltEnvY + kFiltEnvH + kGapY;
+// Filter + filter-env now live in the tabbed side panel on the right, so the
+// FM/VOICES/DETUNE row pulls straight up under the envelope.
+static constexpr int kOscKnobY  = kAdsrY + kAdsrH + kGapY;
 static constexpr int kOscKnobH  = 95;
+
+// Filter side panel — width is derived in resized() from the master knob boxes
+// (GAIN's left edge to PITCH's right edge), since those depend on getWidth().
+// Y matches kWaveY so the FILTER 1/2 tabs (24px tall, same as kWaveH) land on the
+// same top/bottom edges as the OSC1/OSC2 wave-type selectors.
+static constexpr int kSideY = kWaveY;
+static constexpr int kSideH = 660;
 
 // Master-knob boxes (smaller than before: 70×70)
 static constexpr int kBoxW = 70;
 static constexpr int kBoxH = 70;
-static constexpr int kBoxY = 32;
 static constexpr int kBoxGap = 4;
+
+// Gap from the master knob boxes' bottom edge to the top of the FILTER 1/2 tabs,
+// matching the gap FilterPanelComponent leaves between the tabs and the curve
+// display below them (its local "gap" constant, currently also 8 — no shared
+// constant between the two files, so kept in sync by hand). kBoxY is derived
+// rather than fixed so the two gaps can't drift apart if kSideY/kBoxH change.
+static constexpr int kSideToBoxGap = 8;
+static constexpr int kBoxY = kSideY - kSideToBoxGap - kBoxH;
 // ---------------------------------------------------------------------------
 
 void BlueSynthAudioProcessorEditor::DownwardComboLookAndFeel::drawRotarySlider (
@@ -224,7 +236,10 @@ BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProc
     addAndMakeVisible (osc1OctaveLabel);
 
     // ---- Osc 1 wave selector ----
-    juce::StringArray waveChoices { "Sine","Saw","Saw Inverse","Square","Triangle","Pulse 1","Pulse 2","Noise" };
+    // Order must match the choice parameter in PluginProcessor::createParameters() and the
+    // switch in OscData::setWaveType() exactly — all three are indexed by the same integer.
+    juce::StringArray waveChoices { "Sine","Saw","Saw Inverse","Square","Triangle","Pulse 1","Pulse 2","Noise",
+                                    "Square BL","Saw BL","Rectified","Trapezoid","Stepped" };
     oscWaveSelector.addItemList (waveChoices, 1);
     oscWaveSelector.setColour (juce::ComboBox::backgroundColourId, juce::Colour (0xff4A90E2));
     oscWaveSelector.setColour (juce::ComboBox::textColourId,       juce::Colours::white);
@@ -293,12 +308,11 @@ BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProc
 
     addAndMakeVisible (presetComponent);
     addAndMakeVisible (adsr);
-    addAndMakeVisible (filterComponent);
-    addAndMakeVisible (filterEnv);
+    // filterComponent/filterEnv (and the osc-2 pair) are added to filterPanel, which
+    // reparents them into the tabbed side panel and manages their visibility.
+    addAndMakeVisible (filterPanel);
     addAndMakeVisible (osc);
     addAndMakeVisible (adsr2);
-    addAndMakeVisible (filterComponent2);
-    addAndMakeVisible (filterEnv2);
     addAndMakeVisible (osc2);
 }
 
@@ -352,6 +366,19 @@ void BlueSynthAudioProcessorEditor::timerCallback()
     osc2Visualiser.setDisplayFrequency (audioProcessor.getOsc2DisplayHz(), sr);
     osc1Visualiser.repaint();
     osc2Visualiser.repaint();
+
+    // Feed the filter curve the tab-selected filter's live values — same polling
+    // pattern as the scopes; FilterCurveComponent only repaints on change.
+    {
+        const bool second = filterPanel.getSelectedFilter() == 1;
+        auto raw = [this] (const char* id) { return audioProcessor.apvts.getRawParameterValue (id)->load(); };
+        const float liveCutoff = second ? audioProcessor.getFilter2LiveCutoffHz()
+                                        : audioProcessor.getFilter1LiveCutoffHz();
+        filterPanel.updateCurve ((int) raw (second ? "FILTERTYPE2"   : "FILTERTYPE"),
+                                       raw (second ? "FILTERCUTOFF2" : "FILTERCUTOFF"),
+                                       raw (second ? "FILTERRES2"    : "FILTERRES"),
+                                       liveCutoff);
+    }
 
     const auto clip = audioProcessor.fetchAndClearClipFlags();
 
@@ -469,8 +496,8 @@ void BlueSynthAudioProcessorEditor::resized()
     oscWaveSelector  .setBounds (kCol1X, kWaveY,    kColW, kWaveH);
     osc1Visualiser   .setBounds (kCol1X + 1, kVisY + 1, kColW - 2, kVisH - 2);
     adsr             .setBounds (kCol1X, kAdsrY,    kColW, kAdsrH);
-    filterComponent  .setBounds (kCol1X, kFilterY,  kColW, kFilterH);
-    filterEnv        .setBounds (kCol1X, kFiltEnvY, kColW, kFiltEnvH);
+    // Left edge of GAIN's box to the right edge of PITCH's box — box3X is GAIN, box1X is PITCH
+    filterPanel.setBounds (box3X, kSideY, (box1X + kBoxW) - box3X, kSideH);
     osc              .setBounds (kCol1X, kOscKnobY, kColW, kOscKnobH);
 
     // ---- Osc 2 column ----
@@ -489,7 +516,5 @@ void BlueSynthAudioProcessorEditor::resized()
     osc2WaveSelector .setBounds (kCol2X, kWaveY,    kColW, kWaveH);
     osc2Visualiser   .setBounds (kCol2X + 1, kVisY + 1, kColW - 2, kVisH - 2);
     adsr2            .setBounds (kCol2X, kAdsrY,    kColW, kAdsrH);
-    filterComponent2 .setBounds (kCol2X, kFilterY,  kColW, kFilterH);
-    filterEnv2       .setBounds (kCol2X, kFiltEnvY, kColW, kFiltEnvH);
     osc2             .setBounds (kCol2X, kOscKnobY, kColW, kOscKnobH);
 }

@@ -42,7 +42,7 @@ void FilterComponent::paint (juce::Graphics& g)
     g.setColour (juce::Colours::white);
     g.drawRect (getLocalBounds(), 1);
     g.setFont (appFont (12.0f));
-    g.drawText ("FILTER TYPE", getLocalBounds().reduced (8).withHeight (14), juce::Justification::centredLeft);
+    g.drawText ("FILTER TYPE", getLocalBounds().reduced (6).withHeight (14), juce::Justification::centredLeft);
 }
 
 void FilterComponent::resized()
@@ -50,29 +50,45 @@ void FilterComponent::resized()
     const auto bounds      = getLocalBounds().reduced (8);
     const auto labelHeight = 14;
     const auto comboHeight = 22;
-    const auto gap         = 10;
 
     // Title text is drawn in paint() at bounds.getY() with height 14.
     // Combo box sits just below the title with a little extra breathing room.
     const auto typeComboY = bounds.getY() + labelHeight + 6;
     filterTypeSelector.setBounds (bounds.getX(), typeComboY, bounds.getWidth(), comboHeight);
 
-    // Knob row: same size and label gap as OscComponent (68px knobs, 2px below label)
-    const auto knobLabelY    = typeComboY + comboHeight + 8;
-    const auto knobHeight    = 68;
-    const auto knobWidth     = knobHeight;
-    const auto knobY         = knobLabelY + labelHeight + 2;
-    const auto totalWidth    = knobWidth * 3 + gap * 2;
-    const auto startX        = bounds.getX() + (bounds.getWidth() - totalWidth) / 2;
+    // Knob row, matching OscComponent's FM/unison knobs in both size and style (same
+    // colours and LookAndFeel already; this makes the pixel size match too). OscComponent
+    // fills its own component height (kOscKnobH=95 in PluginEditor.cpp) with a square
+    // slider bounds, which works out to 63px there — hardcoded here since the two
+    // components have no shared constant and no natural place to put one for a single
+    // number. If kOscKnobH changes, this should be revisited.
+    const auto knobSize       = 63;
+    const auto knobWidth      = knobSize;
+    const auto knobHeight     = knobSize;
+    const auto knobGap        = juce::jmax (4, (bounds.getWidth() - knobWidth * 3) / 2);
 
-    cutoffLabel.setBounds     (startX,                          knobLabelY, knobWidth, labelHeight);
-    cutoffSlider.setBounds    (startX,                          knobY,      knobWidth, knobHeight);
+    // Split the space below the combo box evenly: the gap from the combo box's bottom
+    // edge to the labels above the knobs equals the gap from the value boxes' bottom
+    // edge down to the outline. comboBottom/outlineBottom are in the same full-component
+    // coordinate space the outline is drawn in (getLocalBounds(), not the reduced bounds).
+    const auto comboBottom   = typeComboY + comboHeight;
+    const auto outlineBottom = getHeight();
+    const auto contentHeight = labelHeight + 2 + knobHeight;
+    const auto verticalGap   = juce::jmax (0, (outlineBottom - comboBottom - contentHeight) / 2);
 
-    resonanceLabel.setBounds  (startX + knobWidth + gap,        knobLabelY, knobWidth, labelHeight);
-    resonanceSlider.setBounds (startX + knobWidth + gap,        knobY,      knobWidth, knobHeight);
+    const auto knobLabelY     = comboBottom + verticalGap;
+    const auto knobY          = knobLabelY + labelHeight + 2;
+    const auto totalWidth     = knobWidth * 3 + knobGap * 2;
+    const auto startX         = bounds.getX() + (bounds.getWidth() - totalWidth) / 2;
 
-    envAmtLabel.setBounds     (startX + (knobWidth + gap) * 2,  knobLabelY, knobWidth, labelHeight);
-    envAmtSlider.setBounds    (startX + (knobWidth + gap) * 2,  knobY,      knobWidth, knobHeight);
+    cutoffLabel.setBounds     (startX,                              knobLabelY, knobWidth, labelHeight);
+    cutoffSlider.setBounds    (startX,                              knobY,      knobWidth, knobHeight);
+
+    resonanceLabel.setBounds  (startX + knobWidth + knobGap,        knobLabelY, knobWidth, labelHeight);
+    resonanceSlider.setBounds (startX + knobWidth + knobGap,        knobY,      knobWidth, knobHeight);
+
+    envAmtLabel.setBounds     (startX + (knobWidth + knobGap) * 2,  knobLabelY, knobWidth, labelHeight);
+    envAmtSlider.setBounds    (startX + (knobWidth + knobGap) * 2,  knobY,      knobWidth, knobHeight);
 }
 
 void FilterComponent::setSliderWithLabel (juce::Slider& slider, juce::Label& label,

@@ -15,6 +15,7 @@
 #include "UI/FilterComponent.h"
 #include "UI/PresetComponent.h"
 #include "UI/OscilloscopeComponent.h"
+#include "UI/FilterPanelComponent.h"
 
 //==============================================================================
 class BlueSynthAudioProcessorEditor  : public juce::AudioProcessorEditor,
@@ -75,6 +76,11 @@ private:
     ADSRComponent      filterEnv2;
     OscComponent       osc2;
     OscilloscopeComponent osc2Visualiser;
+
+    // ---- Filter side panel ----
+    // Declared after the four filter/env components above: its constructor takes references
+    // to them, so member order is load-bearing here.
+    FilterPanelComponent filterPanel { filterComponent, filterEnv, filterComponent2, filterEnv2 };
 
     // Scratch buffers the Timer copies processor snapshots into before pushing to the visualisers
     juce::AudioBuffer<float> osc1VisScratch;
