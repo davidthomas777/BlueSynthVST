@@ -7,9 +7,10 @@ A dual-oscillator subtractive/FM synthesizer plugin with per-oscillator oscillos
 ## Features
 
 - **Live oscilloscopes** — one per oscillator, pitch-synced so the waveform stays the same size at any note or octave, with clip indicators on the outline (amber = oscillator maxed, red = output clipping)
-- **Two independent oscillators**, each with 13 waveforms (Sine, Saw, Saw Inverse, Square, Triangle, Pulse 1, Pulse 2, Noise, plus band-limited Square/Saw, Rectified Sine, Trapezoid, and Stepped Saw), per-sample FM, unison up to 8 voices with detune, and ±4 octave / ±24 semitone tuning
-- **Serum-style filter panel** — Low Pass / High Pass / Band Pass per oscillator, with a live frequency-response curve that sweeps in real time with the filter envelope and a dot marking the current cutoff
-- **Per-oscillator ADSR** amplitude envelope
+- **Two independent oscillators**, each with 13 waveforms: Sine, Saw, Saw Inverse, Square, Triangle, Pulse 1, Pulse 2, Noise, Square (band-limited), Saw (band-limited), Rectified Sine, Trapezoid, and Stepped Saw
+- **Serum-style filter panel** — tabbed FILTER 1/2, Low Pass / High Pass / Band Pass per oscillator, with a live frequency-response curve that sweeps in real time with the filter envelope and a dot marking the current cutoff
+- **Per-oscillator FM**, unison up to 8 voices with detune, and ±4 octave / ±24 semitone tuning
+- **Per-oscillator ADSR** amplitude envelope, plus an independent filter envelope
 - **32-voice polyphony** with portamento/glide and a global pitch offset
 - **Preset system** — save, load, and delete presets from within the plugin
 - **Zero added latency** — no lookahead or internal buffering, so end-to-end latency is whatever your audio buffer is set to
@@ -36,7 +37,12 @@ Plugins are copied to the standard system folders on build (`~/Library/Audio/Plu
 
 ## Tech stack
 
-C++17 · JUCE 8 · `juce::Synthesiser` voice architecture · `juce::dsp` (oscillators, state-variable TPT filters, gain) · APVTS for parameter state and host automation · lock-free FIFOs for audio→UI metering
+**C++17** on **JUCE 8**, using the modules `juce_audio_basics`, `juce_audio_devices`, `juce_audio_formats`, `juce_audio_plugin_client`, `juce_audio_processors`, `juce_audio_utils`, `juce_core`, `juce_data_structures`, `juce_dsp`, `juce_events`, `juce_graphics`, `juce_gui_basics`, `juce_gui_extra`, and `juce_animation`.
+
+- `juce::Synthesiser` / `juce::SynthesiserVoice` for voice management and polyphony
+- `juce::dsp` for oscillators, state-variable TPT filters, and gain processing
+- `AudioProcessorValueTreeState` (APVTS) for parameter state, presets, and host automation
+- Lock-free ring buffers (`juce::AbstractFifo`) for audio-thread → UI-thread metering, feeding both the oscilloscopes and the live filter-curve dot without locks or allocations on the audio thread
 
 ## Project structure
 
@@ -47,19 +53,20 @@ Source/
   SynthVoice.*           Per-voice DSP: oscillators, unison, filters, envelopes, mixing
   SynthSound.h           Marker sound class for juce::Synthesiser
   Data/
-    OscData.*            Oscillator and waveform generation
-    FilterData.*         State-variable filter wrapper
+    OscData.*            Oscillator and waveform generation (13 waveforms)
+    FilterData.*         State-variable (TPT) filter wrapper
     AdsrData.*           ADSR envelope wrapper
     PresetManager.*      Preset save/load/delete
-    VisualizerBuffer.*   Lock-free audio→UI hand-off for the scopes
+    VisualizerBuffer.*   Lock-free audio → UI hand-off for the scopes and filter curve
   UI/
-    OscilloscopeComponent.*  Pitch-synced triggered oscilloscope
-    OscComponent.*           Oscillator panel
+    OscilloscopeComponent.*  Pitch-synced, triggered oscilloscope
     FilterComponent.*        Filter type/cutoff/resonance/env-amount controls
-    FilterCurveComponent.*   Live frequency-response curve for the selected filter
-    FilterPanelComponent.*   Tabbed FILTER 1/2 side panel hosting the above
-    ADSRComponent.*          Envelope panel
+    FilterCurveComponent.*   Live frequency-response curve + cutoff dot
+    FilterPanelComponent.*   Tabbed FILTER 1/2 side panel hosting the above two
+    ADSRComponent.*          Envelope panel (used for both amp and filter envelopes)
+    OscComponent.*           FM and unison controls panel
     PresetComponent.*        Preset browser
+    AppFont.h                Shared UI font helper
 ```
 
 ## Roadmap
