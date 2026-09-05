@@ -54,6 +54,28 @@ public:
     static float getOsc1DisplayHz() { return lastOsc1Hz.load (std::memory_order_relaxed); }
     static float getOsc2DisplayHz() { return lastOsc2Hz.load (std::memory_order_relaxed); }
 
+    // Each filter's actual per-sample cutoff on the voice driving the scope — CUTOFF plus
+    // whatever the filter envelope currently adds, i.e. what the filter is doing right now,
+    // not just where the knob sits. Published once per block (after the per-sample filter
+    // loop), not per sample: the envelope moves on a millisecond timescale, so sampling it
+    // at the UI's 60Hz poll rate loses nothing audible or visible.
+    static float getFilter1LiveCutoffHz() { return lastFilter1Cutoff.load (std::memory_order_relaxed); }
+    static float getFilter2LiveCutoffHz() { return lastFilter2Cutoff.load (std::memory_order_relaxed); }
+
+    // Audio thread, once per processBlock: when no display voice is actively sounding,
+    // renderNextBlock never runs and the atomics above go stale — the dot would freeze at
+    // the last played value (or the startup default) and ignore CUTOFF knob moves made
+    // while idle. This publishes the base knob values instead whenever that's the case.
+    static void publishIdleCutoffs (float baseCutoff1, float baseCutoff2)
+    {
+        auto* voice = displayVoice.load (std::memory_order_relaxed);
+        if (voice == nullptr || ! voice->isVoiceActive())
+        {
+            lastFilter1Cutoff.store (baseCutoff1, std::memory_order_relaxed);
+            lastFilter2Cutoff.store (baseCutoff2, std::memory_order_relaxed);
+        }
+    }
+
     // Osc 2
     void setOsc2Enabled   (bool enabled);
     void setOsc2Gain      (float g);
@@ -135,6 +157,8 @@ private:
     static std::atomic<SynthVoice*> displayVoice;
     static std::atomic<float> lastOsc1Hz;
     static std::atomic<float> lastOsc2Hz;
+    static std::atomic<float> lastFilter1Cutoff;
+    static std::atomic<float> lastFilter2Cutoff;
 
     bool isDisplayVoice() const { return displayVoice.load (std::memory_order_relaxed) == this; }
 

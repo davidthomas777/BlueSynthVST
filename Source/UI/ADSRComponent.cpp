@@ -45,7 +45,7 @@ void ADSRComponent::paint (juce::Graphics& g)
 
     g.setColour (juce::Colours::white);
     g.setFont (appFont (12.0f));
-    g.drawText (titleText, getLocalBounds().reduced (8).withHeight (14), juce::Justification::centredLeft);
+    g.drawText (titleText, getLocalBounds().reduced (6).withHeight (14), juce::Justification::centredLeft);
 }
 
 void ADSRComponent::resized()
@@ -54,7 +54,14 @@ void ADSRComponent::resized()
     const auto titleHeight  = 16;
     const auto padding      = 6;
     const auto labelHeight  = 16;
-    const auto sliderWidth  = bounds.getWidth() / 4 - padding;
+
+    // Four columns need only three internal gaps, not four — the old formula
+    // (bounds.getWidth()/4 - padding) implicitly budgeted a gap after the last column
+    // too, so the whole component was one padding-width short of bounds.getWidth().
+    // Since columns are laid out left-to-right from bounds.getX(), that shortfall
+    // landed entirely as extra space to the right of Release, while Attack sat flush
+    // against the left edge — hence the visibly bigger gap on the right.
+    const auto sliderWidth  = (bounds.getWidth() - padding * 3) / 4;
     const auto sliderHeight = bounds.getHeight() - labelHeight - titleHeight;
     const auto labelY       = bounds.getY() + titleHeight;
     const auto sliderY      = labelY + labelHeight;

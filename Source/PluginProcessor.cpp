@@ -230,6 +230,10 @@ void BlueSynthAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
     synth.renderNextBlock (buffer, midiMessages, 0, buffer.getNumSamples());
     buffer.applyGain (apvts.getRawParameterValue ("MASTERGAIN")->load());
 
+    // After rendering: if no display voice is sounding, keep the visualizer's live-cutoff
+    // atomics tracking the CUTOFF knobs so the curve dot doesn't freeze at a stale value.
+    SynthVoice::publishIdleCutoffs (filterCutoff, filterCutoff2);
+
     // Clip detection, on the real signal rather than the UI's gain-boosted display copy.
     // The per-osc accumulators are still populated here (publishBlock only copies them
     // into the ring buffer), and buffer is post-master-gain: what actually leaves the plugin.
@@ -259,6 +263,9 @@ void BlueSynthAudioProcessor::drainVisualizerAudio (juce::AudioBuffer<float>& os
 
 float BlueSynthAudioProcessor::getOsc1DisplayHz() const { return SynthVoice::getOsc1DisplayHz(); }
 float BlueSynthAudioProcessor::getOsc2DisplayHz() const { return SynthVoice::getOsc2DisplayHz(); }
+
+float BlueSynthAudioProcessor::getFilter1LiveCutoffHz() const { return SynthVoice::getFilter1LiveCutoffHz(); }
+float BlueSynthAudioProcessor::getFilter2LiveCutoffHz() const { return SynthVoice::getFilter2LiveCutoffHz(); }
 
 //==============================================================================
 bool BlueSynthAudioProcessor::hasEditor() const { return true; }
@@ -313,7 +320,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout BlueSynthAudioProcessor::cre
         params.push_back (std::make_unique<juce::AudioParameterFloat> ("OSC1PITCH", "Osc 1 Pitch", r, 0.0f));
     }
     params.push_back (std::make_unique<juce::AudioParameterChoice> ("OSC1WAVETYPE", "Osc 1 Wave Type",
-        juce::StringArray {"Sine","Saw","Saw Inverse","Square","Triangle","Pulse 1","Pulse 2","Noise"}, 0));
+        juce::StringArray {"Sine","Saw","Saw Inverse","Square","Triangle","Pulse 1","Pulse 2","Noise",
+                           "Square BL","Saw BL","Rectified","Trapezoid","Stepped"}, 0));
     params.push_back (std::make_unique<juce::AudioParameterFloat> ("FMFREQ",  "FM Frequency", juce::NormalisableRange<float> {0.0f, 1000.0f, 0.01f, 0.3f}, 0.0f));
     params.push_back (std::make_unique<juce::AudioParameterFloat> ("FMDEPTH", "FM Depth",     juce::NormalisableRange<float> {0.0f, 1000.0f, 0.01f, 0.3f}, 0.0f));
     params.push_back (std::make_unique<juce::AudioParameterFloat> ("ATTACK",  "Attack",       juce::NormalisableRange<float> {0.0f, 1.0f, 0.01f}, 0.1f));
@@ -362,7 +370,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout BlueSynthAudioProcessor::cre
         params.push_back (std::make_unique<juce::AudioParameterFloat> ("OSC2PITCH", "Osc 2 Pitch", r, 0.0f));
     }
     params.push_back (std::make_unique<juce::AudioParameterChoice> ("OSC2WAVETYPE", "Osc 2 Wave Type",
-        juce::StringArray {"Sine","Saw","Saw Inverse","Square","Triangle","Pulse 1","Pulse 2","Noise"}, 0));
+        juce::StringArray {"Sine","Saw","Saw Inverse","Square","Triangle","Pulse 1","Pulse 2","Noise",
+                           "Square BL","Saw BL","Rectified","Trapezoid","Stepped"}, 0));
     params.push_back (std::make_unique<juce::AudioParameterFloat> ("FMFREQ2",  "FM Frequency 2", juce::NormalisableRange<float> {0.0f, 1000.0f, 0.01f, 0.3f}, 0.0f));
     params.push_back (std::make_unique<juce::AudioParameterFloat> ("FMDEPTH2", "FM Depth 2",     juce::NormalisableRange<float> {0.0f, 1000.0f, 0.01f, 0.3f}, 0.0f));
     params.push_back (std::make_unique<juce::AudioParameterFloat> ("ATTACK2",  "Attack 2",       juce::NormalisableRange<float> {0.0f, 1.0f, 0.01f}, 0.1f));

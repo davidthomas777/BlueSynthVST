@@ -78,6 +78,11 @@ public:
     float getOsc1DisplayHz() const;
     float getOsc2DisplayHz() const;
 
+    // Each filter's actual live cutoff (CUTOFF plus whatever the filter envelope is
+    // currently adding), for the filter curve visualizer's live dot.
+    float getFilter1LiveCutoffHz() const;
+    float getFilter2LiveCutoffHz() const;
+
 private:
     juce::Synthesiser synth;
     juce::AudioProcessorValueTreeState::ParameterLayout createParameters();

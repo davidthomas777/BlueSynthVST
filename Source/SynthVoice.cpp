@@ -14,6 +14,10 @@ std::atomic<float> SynthVoice::lastPlayedHz { 0.0f };
 std::atomic<SynthVoice*> SynthVoice::displayVoice { nullptr };
 std::atomic<float> SynthVoice::lastOsc1Hz { 0.0f };
 std::atomic<float> SynthVoice::lastOsc2Hz { 0.0f };
+// 20000.0f here matches kFilterCutoffMax below — can't reference it directly, since static
+// member initializers run before that file-scope constant is declared.
+std::atomic<float> SynthVoice::lastFilter1Cutoff { 20000.0f };
+std::atomic<float> SynthVoice::lastFilter2Cutoff { 20000.0f };
 
 // Upper limit of the filter cutoff range. At this setting a low-pass is meant to be
 // "off", but the filter is still a 2-pole IIR: fed the instantaneous edges of a square
@@ -295,10 +299,16 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer, int st
             gain.process (juce::dsp::ProcessContextReplacing<float> (audioBlock));
         }
 
+        // Tracks the last sample's cutoff so it can be published once after the loop, for
+        // the filter curve visualizer's live dot — not per sample, since the envelope moves
+        // far slower than audio and the UI only polls at 60Hz.
+        float finalCutoff = filterCutoff;
+
         for (int s = 0; s < synthBuffer.getNumSamples(); ++s)
         {
             float env    = filterAdsr.getNextSample();
             float cutoff = juce::jlimit (20.0f, kFilterCutoffMax, filterCutoff + env * filterEnvAmt * kFilterCutoffMax);
+            finalCutoff  = cutoff;
 
             // The envelope still has to advance every sample even when nothing is filtered,
             // or the filter env would freeze while the cutoff sits at the ceiling.
@@ -315,6 +325,9 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer, int st
             for (int ch = 0; ch < synthBuffer.getNumChannels(); ++ch)
                 synthBuffer.setSample (ch, s, filter.processSample (ch, synthBuffer.getSample (ch, s)));
         }
+
+        if (isDisplayVoice())
+            lastFilter1Cutoff.store (finalCutoff, std::memory_order_relaxed);
 
         adsr.applyEnvelopeToBuffer (synthBuffer, 0, synthBuffer.getNumSamples());
 
@@ -344,10 +357,13 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer, int st
             gain2.process (juce::dsp::ProcessContextReplacing<float> (osc2Block));
         }
 
+        float finalCutoff2 = filterCutoff2;
+
         for (int s = 0; s < osc2Buffer.getNumSamples(); ++s)
         {
             float env    = filterAdsr2.getNextSample();
             float cutoff = juce::jlimit (20.0f, kFilterCutoffMax, filterCutoff2 + env * filterEnvAmt2 * kFilterCutoffMax);
+            finalCutoff2 = cutoff;
 
             if (filterIsBypassed (filterType2, cutoff))
                 continue;
@@ -362,6 +378,9 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer, int st
             for (int ch = 0; ch < osc2Buffer.getNumChannels(); ++ch)
                 osc2Buffer.setSample (ch, s, filter2.processSample (ch, osc2Buffer.getSample (ch, s)));
         }
+
+        if (isDisplayVoice())
+            lastFilter2Cutoff.store (finalCutoff2, std::memory_order_relaxed);
 
         adsr2.applyEnvelopeToBuffer (osc2Buffer, 0, osc2Buffer.getNumSamples());
 

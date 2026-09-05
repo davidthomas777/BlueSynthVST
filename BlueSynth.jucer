@@ -44,6 +44,12 @@
             file="Source/UI/OscilloscopeComponent.cpp"/>
       <FILE id="OsCp2h" name="OscilloscopeComponent.h" compile="0" resource="0" file="Source/UI/OscilloscopeComponent.h"/>
       <FILE id="ApFn1h" name="AppFont.h" compile="0" resource="0" file="Source/UI/AppFont.h"/>
+      <FILE id="FlCv1h" name="FilterCurveComponent.cpp" compile="1" resource="0"
+            file="Source/UI/FilterCurveComponent.cpp"/>
+      <FILE id="FlCv2h" name="FilterCurveComponent.h" compile="0" resource="0" file="Source/UI/FilterCurveComponent.h"/>
+      <FILE id="FlPn1h" name="FilterPanelComponent.cpp" compile="1" resource="0"
+            file="Source/UI/FilterPanelComponent.cpp"/>
+      <FILE id="FlPn2h" name="FilterPanelComponent.h" compile="0" resource="0" file="Source/UI/FilterPanelComponent.h"/>
     </GROUP>
   </MAINGROUP>
   <MODULES>
