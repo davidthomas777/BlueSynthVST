@@ -7,8 +7,8 @@ A dual-oscillator subtractive/FM synthesizer plugin with per-oscillator oscillos
 ## Features
 
 - **Live oscilloscopes** — one per oscillator, pitch-synced so the waveform stays the same size at any note or octave, with clip indicators on the outline (amber = oscillator maxed, red = output clipping)
-- **Two independent oscillators**, each with 8 waveforms (Sine, Saw, Saw Inverse, Square, Triangle, Pulse 1, Pulse 2, Noise), per-sample FM, unison up to 8 voices with detune, and ±4 octave / ±24 semitone tuning
-- **Per-oscillator filter** — Low Pass / High Pass / Band Pass with cutoff, resonance, and a dedicated filter envelope
+- **Two independent oscillators**, each with 13 waveforms (Sine, Saw, Saw Inverse, Square, Triangle, Pulse 1, Pulse 2, Noise, plus band-limited Square/Saw, Rectified Sine, Trapezoid, and Stepped Saw), per-sample FM, unison up to 8 voices with detune, and ±4 octave / ±24 semitone tuning
+- **Serum-style filter panel** — Low Pass / High Pass / Band Pass per oscillator, with a live frequency-response curve that sweeps in real time with the filter envelope and a dot marking the current cutoff
 - **Per-oscillator ADSR** amplitude envelope
 - **32-voice polyphony** with portamento/glide and a global pitch offset
 - **Preset system** — save, load, and delete presets from within the plugin
@@ -55,15 +55,18 @@ Source/
   UI/
     OscilloscopeComponent.*  Pitch-synced triggered oscilloscope
     OscComponent.*           Oscillator panel
-    FilterComponent.*        Filter panel
+    FilterComponent.*        Filter type/cutoff/resonance/env-amount controls
+    FilterCurveComponent.*   Live frequency-response curve for the selected filter
+    FilterPanelComponent.*   Tabbed FILTER 1/2 side panel hosting the above
     ADSRComponent.*          Envelope panel
     PresetComponent.*        Preset browser
 ```
 
 ## Roadmap
 
+- **On-screen piano keyboard** — clickable, so the plugin is playable without a MIDI controller
 - **AI preset generation** — describe a sound in plain language ("warm detuned pad", "gritty bass") and have a chatbot build the patch. Every parameter already lives in an `AudioProcessorValueTreeState` and presets are plain XML, so a generated patch is just a preset file the existing `PresetManager` can load.
-- **Band-limited oscillators** to remove aliasing on saw and square at high pitches
+- **Fully band-limited oscillators** — Square BL and Saw BL exist alongside the originals; extend the same treatment to the remaining naive waveforms to remove aliasing everywhere
 - **LFO section** for modulating pitch, filter cutoff, and amplitude
 - **Effects** — reverb, delay, chorus
 - **Factory preset bank** shipped with the plugin
