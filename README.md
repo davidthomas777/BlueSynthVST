@@ -8,7 +8,7 @@ A dual-oscillator subtractive/FM synthesizer plugin with per-oscillator oscillos
 
 - **Live oscilloscopes** — one per oscillator, pitch-synced so the waveform stays the same size at any note or octave, with clip indicators on the outline (amber = oscillator maxed, red = output clipping)
 - **Two independent oscillators**, each with 13 waveforms: Sine, Saw, Saw Inverse, Square, Triangle, Pulse 1, Pulse 2, Noise, Square (band-limited), Saw (band-limited), Rectified Sine, Trapezoid, and Stepped Saw
-- **Serum-style filter panel** — tabbed FILTER 1/2, Low Pass / High Pass / Band Pass per oscillator, with a live frequency-response curve that sweeps in real time with the filter envelope and a dot marking the current cutoff
+- **Filter panel** — tabbed FILTER 1/2, Low Pass / High Pass / Band Pass per oscillator, with a live frequency-response curve that sweeps in real time with the filter envelope and a dot marking the current cutoff
 - **Per-oscillator FM**, unison up to 8 voices with detune, and ±4 octave / ±24 semitone tuning
 - **Per-oscillator ADSR** amplitude envelope, plus an independent filter envelope
 - **32-voice polyphony** with portamento/glide and a global pitch offset
