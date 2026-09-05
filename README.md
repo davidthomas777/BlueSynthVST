@@ -13,6 +13,7 @@ A dual-oscillator subtractive/FM synthesizer plugin with per-oscillator oscillos
 - **Per-oscillator ADSR** amplitude envelope, plus an independent filter envelope
 - **32-voice polyphony** with portamento/glide and a global pitch offset
 - **Preset system** — save, load, and delete presets from within the plugin
+- **On-screen piano** — 44 clickable keys (C2–G5), styled black-and-white to match the rest of the UI; plays through the same note path as MIDI input, so it works with no controller connected
 - **Zero added latency** — no lookahead or internal buffering, so end-to-end latency is whatever your audio buffer is set to
 
 ## Requirements
@@ -43,6 +44,7 @@ Plugins are copied to the standard system folders on build (`~/Library/Audio/Plu
 - `juce::dsp` for oscillators, state-variable TPT filters, and gain processing
 - `AudioProcessorValueTreeState` (APVTS) for parameter state, presets, and host automation
 - Lock-free ring buffers (`juce::AbstractFifo`) for audio-thread → UI-thread metering, feeding both the oscilloscopes and the live filter-curve dot without locks or allocations on the audio thread
+- `juce::MidiKeyboardComponent` / `MidiKeyboardState` for the on-screen piano — merged into the same `MidiBuffer` host-sent MIDI arrives in, so the synth can't tell a click from a real note
 
 ## Project structure
 
@@ -71,7 +73,6 @@ Source/
 
 ## Roadmap
 
-- **On-screen piano keyboard** — clickable, so the plugin is playable without a MIDI controller
 - **AI preset generation** — describe a sound in plain language ("warm detuned pad", "gritty bass") and have a chatbot build the patch. Every parameter already lives in an `AudioProcessorValueTreeState` and presets are plain XML, so a generated patch is just a preset file the existing `PresetManager` can load.
 - **Fully band-limited oscillators** — Square BL and Saw BL exist alongside the originals; extend the same treatment to the remaining naive waveforms to remove aliasing everywhere
 - **LFO section** for modulating pitch, filter cutoff, and amplitude

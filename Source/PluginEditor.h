@@ -44,6 +44,15 @@ private:
 
     BlueSynthAudioProcessor& audioProcessor;
 
+    // On-screen piano. Backed by audioProcessor.keyboardState — clicking a key calls
+    // noteOn()/noteOff() there, and processBlock() merges those into the host's MIDI stream,
+    // so this is just a UI front end onto the same note path real MIDI already uses.
+    // Its in-class initializer reads audioProcessor above, so declaration order here is
+    // load-bearing — audioProcessor must stay declared first (members init in declaration
+    // order regardless of the constructor's initializer-list order).
+    juce::MidiKeyboardComponent pianoKeyboard { audioProcessor.keyboardState,
+                                                juce::MidiKeyboardComponent::horizontalKeyboard };
+
     // ---- Preset ----
     PresetComponent presetComponent;
 
