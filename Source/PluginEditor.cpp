@@ -46,6 +46,31 @@ static constexpr int kBoxW = 70;
 static constexpr int kBoxH = 70;
 static constexpr int kBoxGap = 4;
 
+// On-screen piano — sits directly under the two oscillator columns, matching their
+// combined width (same span the preset bar above already uses), rather than the full
+// window.
+static constexpr int   kPianoLowestNote  = 36;  // C2
+static constexpr int   kPianoHighestNote = 79;  // G5 — 44 notes inclusive, 26 of them white
+static constexpr int   kPianoWhiteKeys   = 26;
+static constexpr int   kPianoWidth       = kCol2X + kColW - kCol1X;   // = 620
+static constexpr float kPianoKeyWidth    = (float) kPianoWidth / (float) kPianoWhiteKeys;
+
+// Top: the same gap the FM/VOICES/DETUNE box (OscComponent, at kOscKnobY) already sits
+// below the amp envelope box above it — i.e. one kGapY, the same spacing rule used
+// throughout this column, not a bigger one invented just for the piano.
+static constexpr int   kPianoY = kOscKnobY + kOscKnobH + kGapY;
+
+// Bottom: pinned to the FILTER ENV box's own bottom edge — NOT the whole filter panel
+// column's bottom (kSideY+kSideH=766). FilterPanelComponent::resized() gives envArea a
+// fixed 150px rather than filling the remaining ~207px of that column, so the FILTER ENV
+// outline actually ends well above the panel's own bottom. This total must be kept in sync
+// by hand with FilterPanelComponent.cpp's tabHeight(24)+gap(8)+curveHeight(110)+gap(8)+
+// filterArea(145)+gap(8)+envArea(150) — same "no shared constant" situation as
+// FilterComponent's knobSize/kOscKnobH match elsewhere in this file.
+static constexpr int   kFilterEnvLocalBottom = 24 + 8 + 110 + 8 + 145 + 8 + 150;   // = 453
+static constexpr int   kPianoH = (kSideY + kFilterEnvLocalBottom) - kPianoY;
+static constexpr int   kWindowHeight     = kSideY + kSideH + kGapY * 2;   // = 786, unchanged
+
 // Gap from the master knob boxes' bottom edge to the top of the FILTER 1/2 tabs,
 // matching the gap FilterPanelComponent leaves between the tabs and the curve
 // display below them (its local "gap" constant, currently also 8 — no shared
@@ -140,7 +165,25 @@ BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProc
       osc2             (audioProcessor.apvts, "FMFREQ2",          "FMDEPTH2",        "UNISONVOICES2",     "UNISONDETUNE2")
 {
     setLookAndFeel (&editorLookAndFeel);
-    setSize (1100, 786);
+    setSize (1100, kWindowHeight);
+
+    // On-screen piano: 44 keys (36-79, C2-G5), styled to match BlueSynth's blue/white
+    // palette via MidiKeyboardComponent's own ColourIds — no LookAndFeel subclass or image
+    // assets needed, consistent with the rest of this all-vector UI.
+    pianoKeyboard.setAvailableRange (kPianoLowestNote, kPianoHighestNote);
+    pianoKeyboard.setOctaveForMiddleC (3);
+    pianoKeyboard.setKeyWidth (kPianoKeyWidth);
+    pianoKeyboard.setScrollButtonsVisible (false);   // range exactly fits the width; no need to scroll
+    // True black-and-white keys rather than tinted blue — the press/hover overlays are the
+    // only accent colour, so clicking still reads clearly against a real piano look.
+    pianoKeyboard.setColour (juce::MidiKeyboardComponent::whiteNoteColourId,           juce::Colours::white);
+    pianoKeyboard.setColour (juce::MidiKeyboardComponent::blackNoteColourId,           juce::Colours::black);
+    pianoKeyboard.setColour (juce::MidiKeyboardComponent::keySeparatorLineColourId,    juce::Colours::black);
+    pianoKeyboard.setColour (juce::MidiKeyboardComponent::mouseOverKeyOverlayColourId, juce::Colour (0xff4A90E2).withAlpha (0.25f));
+    pianoKeyboard.setColour (juce::MidiKeyboardComponent::keyDownOverlayColourId,      juce::Colour (0xff4A90E2).withAlpha (0.55f));
+    pianoKeyboard.setColour (juce::MidiKeyboardComponent::textLabelColourId,           juce::Colours::black);
+    pianoKeyboard.setColour (juce::MidiKeyboardComponent::shadowColourId,              juce::Colours::transparentBlack);
+    addAndMakeVisible (pianoKeyboard);
 
     // OscilloscopeComponent sizes its own window from the played pitch and is repainted by
     // the timer below, so there is nothing to configure here.
@@ -450,6 +493,10 @@ void BlueSynthAudioProcessorEditor::paint (juce::Graphics& g)
     g.drawRect (juce::Rectangle<int> (kCol1X, kVisY, kColW, kVisH), 1);
     g.setColour (outlineColour (osc2ScopeState));
     g.drawRect (juce::Rectangle<int> (kCol2X, kVisY, kColW, kVisH), 1);
+
+    // Piano outline, matching every other panel's 1px white frame
+    g.setColour (juce::Colours::white);
+    g.drawRect (juce::Rectangle<int> (kCol1X, kPianoY, kPianoWidth, kPianoH), 1);
 }
 
 void BlueSynthAudioProcessorEditor::resized()
@@ -517,4 +564,9 @@ void BlueSynthAudioProcessorEditor::resized()
     osc2Visualiser   .setBounds (kCol2X + 1, kVisY + 1, kColW - 2, kVisH - 2);
     adsr2            .setBounds (kCol2X, kAdsrY,    kColW, kAdsrH);
     osc2             .setBounds (kCol2X, kOscKnobY, kColW, kOscKnobH);
+
+    // Piano — spans exactly the width of the two oscillator columns, directly below them.
+    // Inset by 1px from the outline drawn in paint(), same as the oscilloscopes: the
+    // component is opaque, so sitting at the outline's exact rect would paint over it.
+    pianoKeyboard.setBounds (kCol1X + 1, kPianoY + 1, kPianoWidth - 2, kPianoH - 2);
 }

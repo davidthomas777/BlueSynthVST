@@ -115,6 +115,10 @@ void BlueSynthAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear (i, 0, buffer.getNumSamples());
 
+    // Merge on-screen keyboard clicks into the same buffer host-sent MIDI arrives in, before
+    // anything reads it — from here on, synth.renderNextBlock() can't tell the two apart.
+    keyboardState.processNextMidiBuffer (midiMessages, 0, buffer.getNumSamples(), true);
+
     // --- Osc 1 --- (fetched once per block: identical for every voice)
     const bool  osc1Enabled  = apvts.getRawParameterValue ("OSC1ENABLED")->load() >= 0.5f;
     const float attack       = apvts.getRawParameterValue ("ATTACK")->load();

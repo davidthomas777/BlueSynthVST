@@ -59,6 +59,11 @@ public:
     juce::AudioProcessorValueTreeState apvts;
     PresetManager presetManager;
 
+    // Backs the on-screen piano in the editor. Clicking a key calls noteOn()/noteOff() here;
+    // processBlock() merges those into the same MidiBuffer the host's MIDI arrives in, so the
+    // synth can't tell an on-screen click from a real MIDI note.
+    juce::MidiKeyboardState keyboardState;
+
     // Drains all per-oscillator audio (all voices summed, mono) accumulated since the
     // last call into osc1Out/osc2Out, for a UI-side visualizer to consume. Thread-safe
     // to call from the message thread while processBlock runs on the audio thread.
