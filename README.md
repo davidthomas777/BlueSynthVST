@@ -16,6 +16,17 @@ A dual-oscillator subtractive/FM synthesizer plugin with per-oscillator oscillos
 - **On-screen piano** — 44 clickable keys (C2–G5), styled black-and-white to match the rest of the UI; plays through the same note path as MIDI input, so it works with no controller connected
 - **Zero added latency** — no lookahead or internal buffering, so end-to-end latency is whatever your audio buffer is set to
 
+## CPU and voice behavior
+
+BlueSynth processes each active note as a `SynthesiserVoice`. A dense MIDI passage with many simultaneous or overlapping notes can therefore use substantially more CPU than a sparse passage, especially when unison and FM are enabled. The 32-voice limit applies to notes; each note can still contain up to 8 voices per oscillator through unison.
+
+The current DSP includes two CPU-focused optimizations:
+
+- Sine, Rectified Sine, and the FM modulator use a range-reduced polynomial approximation instead of evaluating `std::sin` for every sample. The measured maximum phase error is approximately `1.2e-7`, and normal patch FM tested below approximately `-113 dB` relative error.
+- Filter coefficient updates are cached. Cutoff and resonance are applied to the state-variable TPT filter only when their values change, avoiding repeated recalculation when other voice parameters are unchanged.
+
+These optimizations preserve the existing oscillator and filter interfaces. A synthetic 12-note, 4-unison Release benchmark measured approximately 5% lower voice-render time with FM disabled and 8% lower time with FM enabled. They are workload measurements rather than a guaranteed host CPU limit. For a fair comparison with another synthesizer, use the same MIDI, sample rate, buffer size, note count, unison, and effects.
+
 ## Requirements
 
 - macOS with Xcode
@@ -42,6 +53,8 @@ Plugins are copied to the standard system folders on build (`~/Library/Audio/Plu
 
 - `juce::Synthesiser` / `juce::SynthesiserVoice` for voice management and polyphony
 - `juce::dsp` for oscillators, state-variable TPT filters, and gain processing
+- Fast per-sample oscillator generation in `OscData`, including FM modulation and the polynomial sine path described above
+- Cached cutoff and resonance updates in `FilterData` to avoid redundant state-variable filter coefficient recalculation
 - `AudioProcessorValueTreeState` (APVTS) for parameter state, presets, and host automation
 - Lock-free ring buffers (`juce::AbstractFifo`) for audio-thread → UI-thread metering, feeding both the oscilloscopes and the live filter-curve dot without locks or allocations on the audio thread
 - `juce::MidiKeyboardComponent` / `MidiKeyboardState` for the on-screen piano — merged into the same `MidiBuffer` host-sent MIDI arrives in, so the synth can't tell a click from a real note
@@ -68,6 +81,7 @@ Source/
     ADSRComponent.*          Envelope panel (used for both amp and filter envelopes)
     OscComponent.*           FM and unison controls panel
     PresetComponent.*        Preset browser
+    PianoComponent.*         On-screen piano keyboard
     AppFont.h                Shared UI font helper
 ```
 
@@ -78,6 +92,8 @@ Source/
 - **LFO section** for modulating pitch, filter cutoff, and amplitude
 - **Effects** — reverb, delay, chorus
 - **Factory preset bank** shipped with the plugin
+
+CPU profiling notes and benchmark details are documented in [docs/cpu-profile-2026-09-06.md](docs/cpu-profile-2026-09-06.md).
 
 ## License
 
