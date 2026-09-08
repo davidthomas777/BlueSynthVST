@@ -27,7 +27,7 @@ void OscData::setWaveType (const int choice)
     {
         case 0:
             // Sine
-            initialise ([](float x) {return std::sin (x); });
+            initialise ([](float x) {return sineForPhase (x); });
             break;
             
         case 1:
@@ -109,7 +109,7 @@ void OscData::setWaveType (const int choice)
             // Rectified sine — hollow, an octave up in character. Rectifying introduces a DC
             // offset of 2/pi, so that is subtracted back out and the result rescaled.
             initialise([](float x) {
-                return (std::abs (std::sin (x)) - 0.63662f) * 1.5708f;
+                return (std::abs (sineForPhase (x)) - 0.63662f) * 1.5708f;
             });
             break;
 

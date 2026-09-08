@@ -23,4 +23,6 @@ public:
 
 private:
     juce::dsp::StateVariableTPTFilter<float> filter;
+    float lastCutoff { -1.0f };
+    float lastResonance { -1.0f };
 };

@@ -26,9 +26,17 @@ void FilterData::updateParams (float cutoff, float resonance, int filterType)
         default: break;
     }
 
-    filter.setCutoffFrequency (cutoff);
+    if (cutoff != lastCutoff)
+    {
+        filter.setCutoffFrequency (cutoff);
+        lastCutoff = cutoff;
+    }
     // Map resonance 0..1 to Q 0.707..20
-    filter.setResonance (juce::jmap (resonance, 0.0f, 1.0f, 0.707f, 20.0f));
+    if (resonance != lastResonance)
+    {
+        filter.setResonance (juce::jmap (resonance, 0.0f, 1.0f, 0.707f, 20.0f));
+        lastResonance = resonance;
+    }
 }
 
 void FilterData::process (juce::dsp::AudioBlock<float>& audioBlock)

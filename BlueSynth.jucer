@@ -50,6 +50,9 @@
       <FILE id="FlPn1h" name="FilterPanelComponent.cpp" compile="1" resource="0"
             file="Source/UI/FilterPanelComponent.cpp"/>
       <FILE id="FlPn2h" name="FilterPanelComponent.h" compile="0" resource="0" file="Source/UI/FilterPanelComponent.h"/>
+      <FILE id="PnCp1h" name="PianoComponent.cpp" compile="1" resource="0"
+            file="Source/UI/PianoComponent.cpp"/>
+      <FILE id="PnCp2h" name="PianoComponent.h" compile="0" resource="0" file="Source/UI/PianoComponent.h"/>
     </GROUP>
   </MAINGROUP>
   <MODULES>

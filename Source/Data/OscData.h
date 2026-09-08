@@ -21,7 +21,23 @@ public:
     void setWaveFrequencyHz     (float baseHz, float detuneSemitones);
 
 private:
-    juce::dsp::Oscillator<float> fmOsc { [](float x) { return std::sin(x); } };
+    static float sineForPhase (float x) noexcept
+    {
+        constexpr float pi = juce::MathConstants<float>::pi;
+        constexpr float halfPi = juce::MathConstants<float>::halfPi;
+
+        if (x > halfPi)
+            x = pi - x;
+        else if (x < -halfPi)
+            x = -pi - x;
+
+        const float x2 = x * x;
+        return x + x * x2 * (-1.0f / 6.0f + x2 * (1.0f / 120.0f
+                   + x2 * (-1.0f / 5040.0f + x2 * (1.0f / 362880.0f
+                   + x2 * (-1.0f / 39916800.0f + x2 * (1.0f / 6227020800.0f))))));
+    }
+
+    juce::dsp::Oscillator<float> fmOsc { [](float x) { return sineForPhase (x); } };
     float fmDepth         { 0.0f };
     float fmOscFreq       { 0.0f };
     float carrierBaseFreq { 0.0f };
