@@ -19,6 +19,8 @@
 
 class SynthVoice : public juce::SynthesiserVoice {
 public:
+    ~SynthVoice() override;
+
     bool canPlaySound (juce::SynthesiserSound* sound) override;
     void startNote (int midiNoteNumber, float velocity, juce::SynthesiserSound *sound, int currentPitchWheelPosition) override;
     void stopNote (float velocity, bool allowTailOff) override;
@@ -68,8 +70,10 @@ public:
     // while idle. This publishes the base knob values instead whenever that's the case.
     static void publishIdleCutoffs (float baseCutoff1, float baseCutoff2)
     {
-        auto* voice = displayVoice.load (std::memory_order_relaxed);
-        if (voice == nullptr || ! voice->isVoiceActive())
+        // Do not dereference displayVoice here. Voices can be destroyed while a host is
+        // resetting or removing a channel, and the audio callback may still observe the
+        // old pointer during that hand-off.
+        if (displayVoice.load (std::memory_order_relaxed) == nullptr)
         {
             lastFilter1Cutoff.store (baseCutoff1, std::memory_order_relaxed);
             lastFilter2Cutoff.store (baseCutoff2, std::memory_order_relaxed);

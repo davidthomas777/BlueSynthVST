@@ -19,6 +19,12 @@ std::atomic<float> SynthVoice::lastOsc2Hz { 0.0f };
 std::atomic<float> SynthVoice::lastFilter1Cutoff { 20000.0f };
 std::atomic<float> SynthVoice::lastFilter2Cutoff { 20000.0f };
 
+SynthVoice::~SynthVoice()
+{
+    SynthVoice* expected = this;
+    displayVoice.compare_exchange_strong (expected, nullptr, std::memory_order_relaxed);
+}
+
 // Upper limit of the filter cutoff range. At this setting a low-pass is meant to be
 // "off", but the filter is still a 2-pole IIR: fed the instantaneous edges of a square
 // it overshoots ~29% and rings for ~15 samples, because 20kHz sits at 91% of Nyquist
