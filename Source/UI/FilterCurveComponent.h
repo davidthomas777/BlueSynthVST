@@ -42,15 +42,8 @@ private:
     static constexpr float kMinDb   = -30.0f;
     static constexpr float kMaxDb   =  30.0f;
 
-    // The frequency axis's floor is deliberately above the true minimum CUTOFF value
-    // (20Hz) rather than matching it. A log axis spanning the full 20Hz-20kHz range put
-    // a common cutoff like 1.3kHz at ~60% of the width — past center — because so much of
-    // that range's screen space goes to frequencies below 100Hz. Raising the floor to 80Hz
-    // centers 1.3kHz at ~50% instead, at the cost of the 20-80Hz sub-bass range: a cutoff
-    // set there is clamped and drawn as if it were 80Hz rather than its true value. That
-    // trade was chosen deliberately, not a bug — the plugin's actual CUTOFF parameter still
-    // goes down to 20Hz, only this display's floor moved.
-    static constexpr float kMinFreq =  80.0f;
+    // Match the parameter's full 20Hz-20kHz range so low cutoff changes remain visible.
+    static constexpr float kMinFreq =  20.0f;
     static constexpr float kMaxFreq =  20000.0f;
 
     // Exact magnitude response of JUCE's StateVariableTPTFilter, derived directly from its

@@ -65,7 +65,11 @@ void SynthVoice::stopNote (float velocity, bool allowTailOff) {
 
     bool anyActive = adsr.isActive() || adsr2.isActive();
     if (!allowTailOff || !anyActive)
+    {
+        SynthVoice* expected = this;
+        displayVoice.compare_exchange_strong (expected, nullptr, std::memory_order_relaxed);
         clearCurrentNote();
+    }
 }
 
 void SynthVoice::controllerMoved (int controllerNumber, int newControllerValue) {}
@@ -413,5 +417,9 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer, int st
 
     bool anyActive = adsr.isActive() || adsr2.isActive();
     if (!anyActive)
+    {
+        SynthVoice* expected = this;
+        displayVoice.compare_exchange_strong (expected, nullptr, std::memory_order_relaxed);
         clearCurrentNote();
+    }
 }
