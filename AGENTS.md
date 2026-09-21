@@ -19,11 +19,32 @@ The All build installs/replaces VST3 and AU bundles under `~/Library/Audio/Plug-
 
 ## Code map
 
-- `Source/PluginProcessor.*`: APVTS, parameter/MIDI routing, host state, instance-owned voice state and meters.
-- `Source/SynthVoice.*`: note lifecycle, oscillator banks, filters, amplitude/filter envelopes and glide.
-- `Source/Data/`: oscillator, filter cascade, ADSR wrapper, preset files/name and visualizer FIFO.
-- `Source/PluginEditor.*`, `Source/UI/`: controls, attachments, layout, timers and display math.
-- `Tests/RegressionTests.cpp`, `Tests/run.sh`: offline regression suite, compiled separately from the plugin.
+Each header is listed with its implementation file.
+
+- `Source/`
+  - `PluginProcessor.h` / `.cpp`: APVTS, parameter/MIDI routing, host state, instance-owned voice state and meters.
+  - `PluginEditor.h` / `.cpp`: top-level editor, attachments, layout and timers.
+  - `SynthVoice.h` / `.cpp`: note lifecycle, oscillator banks, filters, amplitude/filter envelopes and glide.
+  - `SynthSound.h`: header-only sound descriptor.
+- `Source/Data/`
+  - `OscData.h` / `.cpp`: oscillator.
+  - `FilterData.h` / `.cpp`: filter cascade.
+  - `AdsrData.h` / `.cpp`: ADSR wrapper.
+  - `PresetManager.h` / `.cpp`: preset files and name.
+  - `VisualizerBuffer.h` / `.cpp`: visualizer FIFO.
+- `Source/UI/`
+  - `OscComponent.h` / `.cpp`: oscillator controls.
+  - `ADSRComponent.h` / `.cpp`: envelope controls.
+  - `FilterComponent.h` / `.cpp`: filter controls.
+  - `FilterPanelComponent.h` / `.cpp`: filter panel layout.
+  - `FilterCurveComponent.h` / `.cpp`: filter response curve display.
+  - `OscilloscopeComponent.h` / `.cpp`: waveform display.
+  - `PianoComponent.h` / `.cpp`: on-screen keyboard.
+  - `PresetComponent.h` / `.cpp`: preset selector.
+  - `AppFont.h`: header-only shared font helper.
+- `Tests/`
+  - `RegressionTests.cpp`, `run.sh`: offline regression suite, compiled separately from the plugin.
+  - `README.md`: test guide.
 
 ## Compatibility invariants
 

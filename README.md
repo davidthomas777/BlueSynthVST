@@ -133,17 +133,31 @@ See [test coverage and limitations](Tests/README.md). Offline passes do not esta
 
 | File or directory | Responsibility |
 | --- | --- |
+| **[Source/](Source)** | |
 | [PluginProcessor](Source/PluginProcessor.cpp) / [header](Source/PluginProcessor.h) | Parameters, MIDI, voices, project state, master output and meters |
+| [PluginEditor](Source/PluginEditor.cpp) / [header](Source/PluginEditor.h) | Layout, parameter attachments and timer |
 | [SynthVoice](Source/SynthVoice.cpp) / [header](Source/SynthVoice.h) | Oscillator banks, tuning, filters, envelopes and note lifecycle |
-| [SynthSound](Source/SynthSound.h) | Note/channel eligibility |
+| [SynthSound.h](Source/SynthSound.h) | Note/channel eligibility |
+| **[Source/Data/](Source/Data)** | |
 | [OscData](Source/Data/OscData.cpp) / [header](Source/Data/OscData.h) | Waveforms and FM |
-| [FilterData](Source/Data/FilterData.cpp) | TPT filter cascade and coefficient caching |
-| [AdsrData](Source/Data/AdsrData.cpp) | JUCE ADSR parameter wrapper |
-| [PresetManager](Source/Data/PresetManager.cpp) | Preset files, current name and change notification |
-| [VisualizerBuffer](Source/Data/VisualizerBuffer.cpp) | Accumulation, metering and display FIFO |
-| [PluginEditor](Source/PluginEditor.cpp) | Layout, parameter attachments and timer |
-| [UI components](Source/UI) | Oscillator, ADSR, filter, curve, scope, piano and preset controls |
-| [Tests](Tests) | Regression executable and runner |
+| [FilterData](Source/Data/FilterData.cpp) / [header](Source/Data/FilterData.h) | TPT filter cascade and coefficient caching |
+| [AdsrData](Source/Data/AdsrData.cpp) / [header](Source/Data/AdsrData.h) | JUCE ADSR parameter wrapper |
+| [PresetManager](Source/Data/PresetManager.cpp) / [header](Source/Data/PresetManager.h) | Preset files, current name and change notification |
+| [VisualizerBuffer](Source/Data/VisualizerBuffer.cpp) / [header](Source/Data/VisualizerBuffer.h) | Accumulation, metering and display FIFO |
+| **[Source/UI/](Source/UI)** | |
+| [OscComponent](Source/UI/OscComponent.cpp) / [header](Source/UI/OscComponent.h) | Oscillator controls |
+| [ADSRComponent](Source/UI/ADSRComponent.cpp) / [header](Source/UI/ADSRComponent.h) | Envelope controls |
+| [FilterComponent](Source/UI/FilterComponent.cpp) / [header](Source/UI/FilterComponent.h) | Filter controls |
+| [FilterPanelComponent](Source/UI/FilterPanelComponent.cpp) / [header](Source/UI/FilterPanelComponent.h) | Filter panel layout |
+| [FilterCurveComponent](Source/UI/FilterCurveComponent.cpp) / [header](Source/UI/FilterCurveComponent.h) | Filter response curve |
+| [OscilloscopeComponent](Source/UI/OscilloscopeComponent.cpp) / [header](Source/UI/OscilloscopeComponent.h) | Waveform display |
+| [PianoComponent](Source/UI/PianoComponent.cpp) / [header](Source/UI/PianoComponent.h) | On-screen keyboard |
+| [PresetComponent](Source/UI/PresetComponent.cpp) / [header](Source/UI/PresetComponent.h) | Preset selector |
+| [AppFont.h](Source/UI/AppFont.h) | Shared UI font helper |
+| **[Tests/](Tests)** | |
+| [RegressionTests.cpp](Tests/RegressionTests.cpp) / [run.sh](Tests/run.sh) | Regression executable and runner |
+| [README.md](Tests/README.md) | Test coverage and limitations |
+| **Other** | |
 | [Architecture guide](docs/architecture.md) | Ownership, signal flow, state and threading |
 | [AGENTS.md](AGENTS.md) | Shared agent instructions, imported by CLAUDE.md |
 
