@@ -207,7 +207,7 @@ Parameters are created in `BlueSynthAudioProcessor::createParameters` and stored
 - `OSC1...` and `OSC2...` enable, gain, octave, pitch, and waveform values.
 - `FMFREQ`, `FMDEPTH`, `FMFREQ2`, and `FMDEPTH2`.
 - Amplitude ADSR values for each oscillator.
-- `FILTERTYPE`, `FILTERCUTOFF`, `FILTERRES`, and `FILTERENVAMT`, with oscillator 2 equivalents.
+- `FILTERTYPE`, `FILTERSLOPE`, `FILTERCUTOFF`, `FILTERRES`, and `FILTERENVAMT`, with oscillator 2 equivalents (`FILTERSLOPE2` etc.). Slope choices are appended, index 0 is the original two-pole response.
 - Filter-envelope ADSR values for each oscillator.
 - `UNISONVOICES`, `UNISONDETUNE`, and oscillator 2 equivalents.
 - Global `PORTAMENTO`, `PITCH`, and `MASTERGAIN`.
@@ -235,6 +235,10 @@ xcodebuild -project Builds/MacOSX/BlueSynth.xcodeproj \
 ```
 
 The generated build copies AU and VST3 plugins to the user's macOS plugin folders and creates the standalone application in `Builds/MacOSX/build/Release/`. Hosts may need a plugin rescan after a new binary is installed.
+
+## Tests
+
+`Tests/RegressionTests.cpp` is an offline executable built by `Tests/run.sh` against the Shared Code target, not linked into the plugin (it is registered in `BlueSynth.jucer` with `compile="0"`). It covers oscillator/FM bounds, instance isolation, preset and host state, filter types and slopes, MIDI release, and filter-envelope behavior. See [Tests/README.md](../Tests/README.md) for coverage and limits.
 
 ## Profiling and extension guidance
 

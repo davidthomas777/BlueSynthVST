@@ -1,105 +1,163 @@
 # BlueSynth
 
-A dual-oscillator subtractive/FM synthesizer plugin with per-oscillator oscilloscopes, built in C++ with [JUCE](https://juce.com). Runs as **AU**, **VST3**, or a **standalone app** on macOS.
+A dual-oscillator subtractive/FM synthesizer built with C++17 and JUCE 8. Available as **VST3**, **AU**, and a **standalone macOS app**.
 
-![BlueSynth](docs/screenshot.png)
+[Features](#features) · [Build and install](#build-and-install) · [Tests](#tests) · [Architecture](docs/architecture.md) · [Source map](#source-map)
+
+![BlueSynth interface before slope selection](docs/screenshot.png)
+
+*Earlier UI snapshot; the current filter panel also includes a slope selector.*
 
 ## Features
 
-- **Live oscilloscopes** — one per oscillator, pitch-synced so the waveform stays the same size at any note or octave, with clip indicators on the outline (amber = oscillator maxed, red = output clipping)
-- **Two independent oscillators**, each with 13 waveforms: Sine, Saw, Saw Inverse, Square, Triangle, Pulse 1, Pulse 2, Noise, Square (band-limited), Saw (band-limited), Rectified Sine, Trapezoid, and Stepped Saw
-- **Filter panel** — tabbed FILTER 1/2 with independent type and slope selectors. Low Pass / High Pass offer 12, 24, 36, or 48 dB/oct; Band Pass offers 6, 12, 18, or 24 dB/oct per side. The live response curve follows the selected slope, resonance, and filter envelope.
-- **Filter compatibility** — existing presets and projects use the original two-pole response. Steeper slopes cascade up to four TPT stages, with resonance in the first stage and neutral additional stages; these are cascaded responses, not Butterworth-aligned higher-order filters. Higher slopes use more filter CPU.
-- **Per-oscillator FM**, unison up to 8 voices with detune, and ±4 octave / ±24 semitone tuning
-- **Per-oscillator ADSR** amplitude envelope, plus an independent filter envelope
-- **32-voice polyphony** with portamento/glide and a global pitch offset
-- **Preset system** — save, load, and delete presets from within the plugin. Projects retain the selected preset name, including when its preset file is unavailable. Older projects without saved name metadata need the preset named once and the project saved again.
-- **On-screen piano** — 44 clickable keys (C2–G5), styled black-and-white to match the rest of the UI; plays through the same note path as MIDI input, so it works with no controller connected
-- **Zero added latency** — no lookahead or internal buffering, so end-to-end latency is whatever your audio buffer is set to
+### Oscillators, FM, and unison
 
-## CPU and voice behavior
+Each oscillator has independent enable, gain, waveform, tuning, FM and unison controls.
 
-BlueSynth processes each active note as a `SynthesiserVoice`. A dense MIDI passage with many simultaneous or overlapping notes can therefore use substantially more CPU than a sparse passage, especially when unison and FM are enabled. The 32-voice limit applies to notes; each note can still contain up to 8 voices per oscillator through unison.
+| Control | Current implementation |
+| --- | --- |
+| Waveforms | Sine, Saw, Saw Inverse, Square, Triangle, Pulse 1, Pulse 2, Noise, Square BL, Saw BL, Rectified, Trapezoid, Stepped |
+| Unison | 1–8 carrier copies per bank, stereo spread, detune and gain normalization |
+| Tuning | ±4 octaves and ±24 semitones per oscillator, plus a global ±24-semitone offset |
+| FM | Independent sine modulator per carrier; frequency and depth range from 0–1000, with depth used as frequency deviation in Hz |
+| Gain | Separate oscillator gains followed by master gain |
 
-The current DSP includes two CPU-focused optimizations:
+Both oscillators run in parallel; oscillator 2 does not modulate oscillator 1. FM is bypassed when either FM frequency or depth is zero.
 
-- Sine, Rectified Sine, and the FM modulator use a range-reduced polynomial approximation instead of evaluating `std::sin` for every sample. The measured maximum phase error is approximately `1.2e-7`, and normal patch FM tested below approximately `-113 dB` relative error.
-- Filter coefficient updates are cached. Cutoff and resonance are applied to the state-variable TPT filter only when their values change, avoiding repeated recalculation when other voice parameters are unchanged.
+Square BL and Saw BL use fixed harmonic sums. They reduce harmonic content but are **not alias-free at every pitch**. Pitch-dependent band-limiting and lookup tables are future work.
 
-These optimizations preserve the existing oscillator and filter interfaces. A synthetic 12-note, 4-unison Release benchmark measured approximately 5% lower voice-render time with FM disabled and 8% lower time with FM enabled. They are workload measurements rather than a guaranteed host CPU limit. For a fair comparison with another synthesizer, use the same MIDI, sample rate, buffer size, note count, unison, and effects.
+### Filters and envelopes
 
-## Requirements
+Each oscillator has a filter, amplitude ADSR and filter ADSR. FILTER 1/2 tabs select visible controls; both enabled oscillator chains continue processing.
 
-- macOS with Xcode
-- [JUCE](https://juce.com) 8.x — the project expects a sibling `JUCE` checkout. If yours lives elsewhere, open `BlueSynth.jucer` in the Projucer and re-save to regenerate the build files.
+| Filter type | Slopes |
+| --- | --- |
+| Low-pass | 12, 24, 36, 48 dB/oct |
+| High-pass | 12, 24, 36, 48 dB/oct |
+| Band-pass | 6, 12, 18, 24 dB/oct **on each side** |
 
-## Building
+- Cutoff spans 20 Hz–20 kHz. Resonance emphasizes the cutoff region.
+- Positive envelope amount raises cutoff, negative amount lowers it, and zero amount removes the filter envelope's influence.
+- Attack/decay span 0–1 second, sustain 0–1, and release 0–3 seconds for both envelope types.
+- Envelopes restart for newly assigned notes and advance while an oscillator is disabled.
+- Low-pass at 20 kHz is bypassed. Positive modulation at that ceiling cannot raise it further.
+- Filter release does not extend a note beyond its amplitude release.
 
-**Via Xcode** — open `Builds/MacOSX/BlueSynth.xcodeproj`, pick a scheme (`BlueSynth - AU`, `- VST3`, `- Standalone Plugin`, or `- All`), and build.
+Amount applies a **linear Hz offset**: `base cutoff + envelope × amount × 20000`, clamped to the cutoff range. A 1 kHz base with amount +0.1 reaches 3 kHz at the envelope peak. Amount has a zero snap region below an absolute value of 0.05.
 
-**From the command line:**
+Steeper slopes use more stages and CPU. The default reproduces the original two-pole response; older presets without slope settings restore that default. See [filter implementation](docs/architecture.md#filters-and-envelopes) for stage and resonance details.
+
+### Notes, glide, and MIDI
+
+- **32-note polyphony**, with voice stealing enabled by the current JUCE default. Releases occupy voices too.
+- Up to 16 carriers per note when both banks use eight-way unison.
+- Global portamento from 0–2 seconds, with glide history local to each plugin instance.
+- A 44-key piano sends notes through the host MIDI path. It spans MIDI notes 36–79 and labels middle C as C3.
+- Mono and stereo output layouts.
+
+Velocity-sensitive gain, pitch-wheel modulation, custom MIDI CC mappings and MPE are not implemented. JUCE handles standard note/pedal behavior, but pedal edge cases are not yet covered by the regression suite.
+
+### Presets and project recall
+
+Save, load, delete and step through XML presets in:
+
+```text
+~/Documents/BlueSynth/Presets/
+```
+
+Projects save the sound settings **and the last known preset name**. Editing the sound retains that name. Restoration uses the project's saved settings without reloading the preset file, so the name can remain visible if the file has been moved or deleted.
+
+Older projects without name metadata cannot recover the original name automatically. BlueSynth cannot infer a name from an external host preset that supplies no name metadata. The displayed name identifies the sound's origin; it does not guarantee a match with the preset file.
+
+### Visual feedback
+
+- Two pitch-synchronized scopes, following a selected note rather than displaying a whole chord's sum.
+- Amber borders indicate an oscillator sum reaching full scale; red indicates output reaching full scale. These are meters, not limiters.
+- A filter curve showing type, slope, resonance and envelope-modulated cutoff, including cutoff updates while idle.
+- Scope display shaping that affects only the picture.
+
+## CPU and latency
+
+CPU depends on active notes, release tails, enabled oscillators, unison, FM, filter modulation and slope. Filters run **after** each unison bank is mixed, once per oscillator bank per note.
+
+Current optimizations include a range-reduced sine polynomial, cached filter coefficients, and buffers allocated during preparation for the normal block-size path. These do not guarantee a particular host CPU percentage.
+
+BlueSynth reports no added processing latency and uses no lookahead. Actual playback latency also depends on the host, audio interface and driver. The reported three-second release tail is separate from latency.
+
+[Historical CPU profiling](docs/cpu-profile-2026-09-06.md) describes an earlier build, not current performance.
+
+## Build and install
+
+Requirements: macOS, Xcode and JUCE 8. The inspected local checkout is JUCE 8.0.12; the generated project uses C++17.
+
+The exporter references **`../../JUCE/modules` relative to this repository**, not `../JUCE`. `BlueSynth.jucer` is the source of truth. Generated `Builds/` files are Git-ignored, so a fresh checkout may need regeneration in Projucer. Configure other JUCE locations there.
+
+With this directory layout, regenerate from the repository root:
+
+```bash
+../../JUCE/Projucer.app/Contents/MacOS/Projucer --resave BlueSynth.jucer
+```
+
+Build the release:
 
 ```bash
 xcodebuild -project Builds/MacOSX/BlueSynth.xcodeproj \
-           -scheme "BlueSynth - All" -configuration Release build
+  -scheme "BlueSynth - All" -configuration Release build
 ```
 
-Plugins are copied to the standard system folders on build (`~/Library/Audio/Plug-Ins/VST3` and `.../Components`); the standalone app lands in `Builds/MacOSX/build/Release/`. Rescan plugins in your DAW to pick up a new build.
+Alternatively, open the generated Xcode project and select **BlueSynth - All**. The current shared schemes are All and VST3; AU and Standalone Plugin are targets included by All.
 
-> If you add or remove source files, add them in `BlueSynth.jucer` and re-save with the Projucer — files added directly in Xcode are lost the next time the project is regenerated.
+| Output | Default location |
+| --- | --- |
+| Installed VST3 | `~/Library/Audio/Plug-Ins/VST3/BlueSynth.vst3` |
+| Installed AU | `~/Library/Audio/Plug-Ins/Components/BlueSynth.component` |
+| Standalone app | `Builds/MacOSX/build/Release/BlueSynth.app` |
 
-## Tech stack
+The All build replaces installed plugins. Fully quit and reopen the host to unload the old binary; rescan if needed. Overriding the build output directory does not disable installation steps.
 
-**C++17** on **JUCE 8**, using the modules `juce_audio_basics`, `juce_audio_devices`, `juce_audio_formats`, `juce_audio_plugin_client`, `juce_audio_processors`, `juce_audio_utils`, `juce_core`, `juce_data_structures`, `juce_dsp`, `juce_events`, `juce_graphics`, `juce_gui_basics`, `juce_gui_extra`, and `juce_animation`.
+After adding, removing or renaming source files, update the .jucer project and regenerate with Projucer. Do not hand-edit Xcode's file list.
 
-- `juce::Synthesiser` / `juce::SynthesiserVoice` for voice management and polyphony
-- `juce::dsp` for oscillators, state-variable TPT filters, and gain processing
-- Fast per-sample oscillator generation in `OscData`, including FM modulation and the polynomial sine path described above
-- Cached cutoff and resonance updates in `FilterData` to avoid redundant state-variable filter coefficient recalculation
-- `AudioProcessorValueTreeState` (APVTS) for parameter state, presets, and host automation
-- Lock-free ring buffers (`juce::AbstractFifo`) for audio-thread → UI-thread metering, feeding both the oscilloscopes and the live filter-curve dot without locks or allocations on the audio thread
-- `juce::MidiKeyboardComponent` / `MidiKeyboardState` for the on-screen piano — merged into the same `MidiBuffer` host-sent MIDI arrives in, so the synth can't tell a click from a real note
+## Tests
 
-## Project structure
-
+```bash
+./Tests/run.sh
+# Equivalent:
+bash Tests/run.sh
 ```
-Source/
-  PluginProcessor.*      Parameter layout, MIDI/parameter → voice routing, clip detection
-  PluginEditor.*         Top-level UI and layout
-  SynthVoice.*           Per-voice DSP: oscillators, unison, filters, envelopes, mixing
-  SynthSound.h           Marker sound class for juce::Synthesiser
-  Data/
-    OscData.*            Oscillator and waveform generation (13 waveforms)
-    FilterData.*         State-variable (TPT) filter wrapper
-    AdsrData.*           ADSR envelope wrapper
-    PresetManager.*      Preset save/load/delete
-    VisualizerBuffer.*   Lock-free audio → UI hand-off for the scopes and filter curve
-  UI/
-    OscilloscopeComponent.*  Pitch-synced, triggered oscilloscope
-    FilterComponent.*        Filter type/cutoff/resonance/env-amount controls
-    FilterCurveComponent.*   Live frequency-response curve + cutoff dot
-    FilterPanelComponent.*   Tabbed FILTER 1/2 side panel hosting the above two
-    ADSRComponent.*          Envelope panel (used for both amp and filter envelopes)
-    OscComponent.*           FM and unison controls panel
-    PresetComponent.*        Preset browser
-    PianoComponent.*         On-screen piano keyboard
-    AppFont.h                Shared UI font helper
-```
+
+The runner builds Shared Code and executes **10 regression groups** for FM output, instance isolation, preset state, filters, MIDI releases and filter envelopes. It does not install plugins or modify preset files. Processor construction may create the preset directory if absent.
+
+See [test coverage and limitations](Tests/README.md). Offline passes do not establish FL Studio project compatibility, perceived sound quality or a CPU ceiling.
+
+## Source map
+
+| File or directory | Responsibility |
+| --- | --- |
+| [PluginProcessor](Source/PluginProcessor.cpp) / [header](Source/PluginProcessor.h) | Parameters, MIDI, voices, project state, master output and meters |
+| [SynthVoice](Source/SynthVoice.cpp) / [header](Source/SynthVoice.h) | Oscillator banks, tuning, filters, envelopes and note lifecycle |
+| [SynthSound](Source/SynthSound.h) | Note/channel eligibility |
+| [OscData](Source/Data/OscData.cpp) / [header](Source/Data/OscData.h) | Waveforms and FM |
+| [FilterData](Source/Data/FilterData.cpp) | TPT filter cascade and coefficient caching |
+| [AdsrData](Source/Data/AdsrData.cpp) | JUCE ADSR parameter wrapper |
+| [PresetManager](Source/Data/PresetManager.cpp) | Preset files, current name and change notification |
+| [VisualizerBuffer](Source/Data/VisualizerBuffer.cpp) | Accumulation, metering and display FIFO |
+| [PluginEditor](Source/PluginEditor.cpp) | Layout, parameter attachments and timer |
+| [UI components](Source/UI) | Oscillator, ADSR, filter, curve, scope, piano and preset controls |
+| [Tests](Tests) | Regression executable and runner |
+| [Architecture guide](docs/architecture.md) | Ownership, signal flow, state and threading |
+| [AGENTS.md](AGENTS.md) | Shared agent instructions, imported by CLAUDE.md |
 
 ## Roadmap
 
-- **AI preset generation** — describe a sound in plain language ("warm detuned pad", "gritty bass") and have a chatbot build the patch. Every parameter already lives in an `AudioProcessorValueTreeState` and presets are plain XML, so a generated patch is just a preset file the existing `PresetManager` can load.
-- **Fully band-limited oscillators** — Square BL and Saw BL exist alongside the originals; extend the same treatment to the remaining naive waveforms to remove aliasing everywhere
-- **LFO section** for modulating pitch, filter cutoff, and amplitude
-- **Effects** — reverb, delay, chorus
-- **Factory preset bank** shipped with the plugin
+Planned, not implemented:
 
-CPU profiling notes and benchmark details are documented in [docs/cpu-profile-2026-09-06.md](docs/cpu-profile-2026-09-06.md).
+- Shared waveform lookup tables and pitch-aware band-limiting.
+- LFO modulation and a broader modulation system.
+- Reverb, delay, chorus and other effects.
+- Factory presets and AI-assisted preset generation.
 
-Run `bash Tests/run.sh` for the macOS regression suite covering FM output bounds, multiple plugin instances, preset state, filters, MIDI release behavior, and filter ADSR/amount behavior across sample rates and block sizes. See [Tests/README.md](Tests/README.md) for coverage and limitations.
-
-For a detailed explanation of the audio path, voice lifecycle, parameter system, UI, visualizer threading, presets, and extension points, see [docs/architecture.md](docs/architecture.md).
+Further validation targets include sustain pedals, rapid repeated notes, automation during release, and audible discontinuities when switching filter types/slopes at high resonance.
 
 ## License
 
-Not yet licensed. Built with [JUCE](https://juce.com), which is separately licensed under its own terms.
+No project license has been declared. JUCE is separately licensed; see its bundled license and [JUCE's website](https://juce.com).
