@@ -24,10 +24,15 @@ BlueSynthAudioProcessor::BlueSynthAudioProcessor()
                        ), apvts (*this, nullptr, "Parameters", createParameters())
 #endif
 {
+    presetManager.onPresetChanged = [this]
+    {
+        updateHostDisplay (ChangeDetails{}.withNonParameterStateChanged (true)
+                                         .withProgramChanged (true));
+    };
     synth.addSound (new SynthSound());
     for (int i = 0; i < 32; ++i)
     {
-        auto* voice = new SynthVoice();
+        auto* voice = new SynthVoice (voiceState);
         voice->setVisualizerTargets (&osc1Vis, &osc2Vis, &osc1Display, &osc2Display);
         synth.addVoice (voice);
     }
@@ -62,12 +67,12 @@ bool BlueSynthAudioProcessor::isMidiEffect() const {
    #endif
 }
 
-double BlueSynthAudioProcessor::getTailLengthSeconds() const { return 0.0; }
+double BlueSynthAudioProcessor::getTailLengthSeconds() const { return 3.0; }
 int    BlueSynthAudioProcessor::getNumPrograms()              { return 1; }
 int    BlueSynthAudioProcessor::getCurrentProgram()           { return 0; }
 void   BlueSynthAudioProcessor::setCurrentProgram (int)       {}
-const  juce::String BlueSynthAudioProcessor::getProgramName (int) { return {}; }
-void   BlueSynthAudioProcessor::changeProgramName (int, const juce::String&) {}
+const  juce::String BlueSynthAudioProcessor::getProgramName (int) { return presetManager.getCurrentPresetName(); }
+void   BlueSynthAudioProcessor::changeProgramName (int, const juce::String& name) { presetManager.setCurrentPresetName (name); }
 
 //==============================================================================
 void BlueSynthAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
@@ -133,6 +138,7 @@ void BlueSynthAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
     const float filterCutoff = apvts.getRawParameterValue ("FILTERCUTOFF")->load();
     const float filterRes    = apvts.getRawParameterValue ("FILTERRES")->load();
     const float filterEnvAmt = apvts.getRawParameterValue ("FILTERENVAMT")->load();
+    const int filterSlope = (int) apvts.getRawParameterValue ("FILTERSLOPE")->load();
     const int   filterType   = static_cast<int> (apvts.getRawParameterValue ("FILTERTYPE")->load());
 
     const float fEnvAtk = apvts.getRawParameterValue ("FILTERENVATTACK")->load();
@@ -163,6 +169,7 @@ void BlueSynthAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
     const float filterCutoff2 = apvts.getRawParameterValue ("FILTERCUTOFF2")->load();
     const float filterRes2    = apvts.getRawParameterValue ("FILTERRES2")->load();
     const float filterEnvAmt2 = apvts.getRawParameterValue ("FILTERENVAMT2")->load();
+    const int filterSlope2 = (int) apvts.getRawParameterValue ("FILTERSLOPE2")->load();
     const int   filterType2   = static_cast<int> (apvts.getRawParameterValue ("FILTERTYPE2")->load());
 
     const float fEnvAtk2 = apvts.getRawParameterValue ("FILTERENVATTACK2")->load();
@@ -202,7 +209,8 @@ void BlueSynthAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
             voice->updatePortamento (portamento);
             voice->updatePitch      (pitch);
             if (adsrChanged) voice->update (attack, decay, sustain, release);
-            voice->updateFilter     (filterCutoff, filterRes, filterEnvAmt, filterType);
+            voice->updateFilter     (filterCutoff, filterRes, filterEnvAmt, filterType,
+                                     filterSlope);
             if (filterEnvChanged) voice->updateFilterEnv (fEnvAtk, fEnvDec, fEnvSus, fEnvRel);
 
             // --- Osc 2 ---
@@ -214,7 +222,8 @@ void BlueSynthAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
             voice->setOsc2FmParams  (fmDepth2, fmFreq2);
             voice->updateUnison2    (unisonVoices2, unisonDetune2);
             if (adsr2Changed) voice->update2 (attack2, decay2, sustain2, release2);
-            voice->updateFilter2    (filterCutoff2, filterRes2, filterEnvAmt2, filterType2);
+            voice->updateFilter2    (filterCutoff2, filterRes2, filterEnvAmt2, filterType2,
+                                     filterSlope2);
             if (filterEnv2Changed) voice->updateFilterEnv2 (fEnvAtk2, fEnvDec2, fEnvSus2, fEnvRel2);
         }
     }
@@ -236,7 +245,7 @@ void BlueSynthAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
 
     // After rendering: if no display voice is sounding, keep the visualizer's live-cutoff
     // atomics tracking the CUTOFF knobs so the curve dot doesn't freeze at a stale value.
-    SynthVoice::publishIdleCutoffs (filterCutoff, filterCutoff2);
+    voiceState.publishIdleCutoffs (filterCutoff, filterCutoff2);
 
     // Clip detection, on the real signal rather than the UI's gain-boosted display copy.
     // The per-osc accumulators are still populated here (publishBlock only copies them
@@ -265,11 +274,11 @@ void BlueSynthAudioProcessor::drainVisualizerAudio (juce::AudioBuffer<float>& os
     osc2Display.drain (osc2Out);
 }
 
-float BlueSynthAudioProcessor::getOsc1DisplayHz() const { return SynthVoice::getOsc1DisplayHz(); }
-float BlueSynthAudioProcessor::getOsc2DisplayHz() const { return SynthVoice::getOsc2DisplayHz(); }
+float BlueSynthAudioProcessor::getOsc1DisplayHz() const { return voiceState.lastOsc1Hz.load (std::memory_order_relaxed); }
+float BlueSynthAudioProcessor::getOsc2DisplayHz() const { return voiceState.lastOsc2Hz.load (std::memory_order_relaxed); }
 
-float BlueSynthAudioProcessor::getFilter1LiveCutoffHz() const { return SynthVoice::getFilter1LiveCutoffHz(); }
-float BlueSynthAudioProcessor::getFilter2LiveCutoffHz() const { return SynthVoice::getFilter2LiveCutoffHz(); }
+float BlueSynthAudioProcessor::getFilter1LiveCutoffHz() const { return voiceState.lastFilter1Cutoff.load (std::memory_order_relaxed); }
+float BlueSynthAudioProcessor::getFilter2LiveCutoffHz() const { return voiceState.lastFilter2Cutoff.load (std::memory_order_relaxed); }
 
 //==============================================================================
 bool BlueSynthAudioProcessor::hasEditor() const { return true; }
@@ -283,6 +292,7 @@ juce::AudioProcessorEditor* BlueSynthAudioProcessor::createEditor()
 void BlueSynthAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
     auto state = apvts.copyState();
+    state.setProperty ("presetName", presetManager.getCurrentPresetName(), nullptr);
     std::unique_ptr<juce::XmlElement> xml (state.createXml());
     if (xml != nullptr)
         copyXmlToBinary (*xml, destData);
@@ -294,8 +304,21 @@ void BlueSynthAudioProcessor::setStateInformation (const void* data, int sizeInB
     if (xml != nullptr)
     {
         auto state = juce::ValueTree::fromXml (*xml);
-        if (state.isValid())
+        if (state.hasType (apvts.state.getType()))
+        {
+            for (const auto* id : { "FILTERSLOPE", "FILTERSLOPE2" })
+            {
+                if (! state.getChildWithProperty ("id", id).isValid())
+                {
+                    juce::ValueTree parameter ("PARAM");
+                    parameter.setProperty ("id", id, nullptr);
+                    parameter.setProperty ("value", 0.0f, nullptr);
+                    state.appendChild (parameter, nullptr);
+                }
+            }
+            presetManager.setCurrentPresetName (state.getProperty ("presetName").toString(), false);
             apvts.replaceState (state);
+        }
     }
 }
 
@@ -403,5 +426,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout BlueSynthAudioProcessor::cre
     params.push_back (std::make_unique<juce::AudioParameterInt>   ("UNISONVOICES2", "Unison Voices 2", 1, 8, 1));
     params.push_back (std::make_unique<juce::AudioParameterFloat> ("UNISONDETUNE2", "Unison Detune 2", juce::NormalisableRange<float> {0.0f, 1.0f, 0.01f}, 0.0f));
 
+    params.push_back (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { "FILTERSLOPE", 1 }, "Filter Slope", juce::StringArray { "2 poles", "4 poles", "6 poles", "8 poles" }, 0));
+    params.push_back (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { "FILTERSLOPE2", 1 }, "Filter Slope 2", juce::StringArray { "2 poles", "4 poles", "6 poles", "8 poles" }, 0));
     return { params.begin(), params.end() };
 }

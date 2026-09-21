@@ -10,17 +10,19 @@
 
 #include "FilterCurveComponent.h"
 #include <complex>
+#include "../Data/FilterData.h"
 
 FilterCurveComponent::FilterCurveComponent()
 {
     setOpaque (true);
 }
 
-void FilterCurveComponent::setParams (int filterType, float cutoffHz, float resonance, double sampleRateToUse)
+void FilterCurveComponent::setParams (int filterType, float cutoffHz, float resonance, double sampleRateToUse, int slopeToUse)
 {
-    if (filterType == type && cutoffHz == cutoff && resonance == res && sampleRateToUse == sampleRate)
+    if (filterType == type && cutoffHz == cutoff && resonance == res && sampleRateToUse == sampleRate && slopeToUse == slope)
         return;
 
+    slope      = slopeToUse;
     type       = filterType;
     cutoff     = cutoffHz;
     res        = resonance;
@@ -37,34 +39,43 @@ void FilterCurveComponent::setLiveCutoff (float liveCutoffHz)
     repaint();
 }
 
-float FilterCurveComponent::magnitudeAt (int filterType, float freq, float cutoffHz, float resonance, double sr)
+float FilterCurveComponent::magnitudeAt (int filterType, float freq, float cutoffHz, float resonance, double sr, int slope)
 {
-    // Same mapping as FilterData::updateParams — keep the two in sync.
-    const double q  = juce::jmap ((double) resonance, 0.0, 1.0, 0.707, 20.0);
-    const double g  = std::tan (juce::MathConstants<double>::pi * (double) cutoffHz / sr);
-    const double R2 = 1.0 / q;
-    const double h  = 1.0 / (1.0 + R2 * g + g * g);
-
-    // z = e^{jw}, evaluating the filter's exact z-domain transfer function at this
-    // frequency — derived algebraically from the same s1/s2 recurrence
-    // juce::dsp::StateVariableTPTFilter::processSample runs, not substituted into an
-    // analog formula.
-    const double w = juce::MathConstants<double>::twoPi * (double) freq / sr;
-    const std::complex<double> z (std::cos (w), std::sin (w));
-
-    const std::complex<double> A     = g * (z + 1.0) / (z - 1.0);
-    const std::complex<double> denom = 1.0 + (2.0 * g * h / (z - 1.0)) * ((g + R2) + A);
-    const std::complex<double> yHP   = h / denom;
-
-    std::complex<double> result;
-    switch (filterType)
+    sr = sr > 0.0 ? sr : 44100.0;
+    cutoffHz = juce::jlimit (1.0f, (float) (sr * 0.499), cutoffHz);
+    freq = juce::jlimit (1.0f, (float) (sr * 0.499), freq);
+    float magnitude = 1.0f;
+    for (int stage = 0; stage <= juce::jlimit (0, 3, slope); ++stage)
     {
-        case 1:  result = yHP;          break;   // High pass
-        case 2:  result = A * yHP;      break;   // Band pass
-        default: result = A * A * yHP;  break;   // Low pass
-    }
+        const double q = FilterData::stageQ (resonance, stage);
+        const double g  = std::tan (juce::MathConstants<double>::pi * (double) cutoffHz / sr);
+        const double R2 = 1.0 / q;
+        const double h  = 1.0 / (1.0 + R2 * g + g * g);
 
-    return (float) std::abs (result);
+        // z = e^{jw}, evaluating the filter's exact z-domain transfer function at this
+        // frequency — derived algebraically from the same s1/s2 recurrence
+        // juce::dsp::StateVariableTPTFilter::processSample runs, not substituted into an
+        // analog formula.
+        const double w = juce::MathConstants<double>::twoPi * (double) freq / sr;
+        const std::complex<double> z (std::cos (w), std::sin (w));
+
+        const std::complex<double> A     = g * (z + 1.0) / (z - 1.0);
+        const std::complex<double> denom = 1.0 + (2.0 * g * h / (z - 1.0)) * ((g + R2) + A);
+        const std::complex<double> yHP   = h / denom;
+
+        std::complex<double> result;
+        switch (filterType)
+        {
+            case 1:  result = yHP;          break;   // High pass
+            case 2:  result = A * yHP;      break;   // Band pass
+            default: result = A * A * yHP;  break;   // Low pass
+        }
+
+        magnitude *= (float) std::abs (result);
+        if (filterType == 2 && stage > 0)
+            magnitude /= (float) q;
+    }
+    return magnitude;
 }
 
 void FilterCurveComponent::paint (juce::Graphics& g)
@@ -103,7 +114,7 @@ void FilterCurveComponent::paint (juce::Graphics& g)
         const float freq = std::exp (logMin + (logMax - logMin) * (float) x / (float) (width - 1));
         const float db   = bypassed ? 0.0f
                                     : juce::Decibels::gainToDecibels (
-                                          magnitudeAt (type, freq, drawCutoff, res, sampleRate), kMinDb);
+                                          magnitudeAt (type, freq, drawCutoff, res, sampleRate, slope), kMinDb);
 
         const float y = juce::jmap (juce::jlimit (kMinDb, kMaxDb, db),
                                     kMaxDb, kMinDb, bounds.getY(), bounds.getBottom());
@@ -129,7 +140,7 @@ void FilterCurveComponent::paint (juce::Graphics& g)
     const float dotFreq = drawCutoff;
     const float dotDb   = bypassed ? 0.0f
                                    : juce::Decibels::gainToDecibels (
-                                         magnitudeAt (type, dotFreq, drawCutoff, res, sampleRate), kMinDb);
+                                         magnitudeAt (type, dotFreq, drawCutoff, res, sampleRate, slope), kMinDb);
 
     const float dotX = bounds.getX() + (std::log (dotFreq) - logMin) / (logMax - logMin) * (float) (width - 1);
     const float dotY = juce::jmap (juce::jlimit (kMinDb, kMaxDb, dotDb),

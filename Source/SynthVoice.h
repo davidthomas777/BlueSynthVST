@@ -33,7 +33,7 @@ public:
     void setOsc1Enabled  (bool enabled);
     void setOsc1Gain     (float g);
     void update          (float attack, float decay, float sustain, float release);
-    void updateFilter    (float cutoff, float resonance, float envAmt, int type);
+    void updateFilter    (float cutoff, float resonance, float envAmt, int type, int slope = 0);
     void updateFilterEnv (float attack, float decay, float sustain, float release);
     void setOscWaveType  (int choice);
     void setOscFmParams  (float depth, float freq);
@@ -51,34 +51,24 @@ public:
     void setVisualizerTargets (VisualizerBuffer* osc1Target,        VisualizerBuffer* osc2Target,
                                VisualizerBuffer* osc1DisplayTarget, VisualizerBuffer* osc2DisplayTarget);
 
-    // Frequency of each oscillator in the voice currently driving the scope, so the display can
-    // size its window to the pitch actually on screen. 0 until the first note is played.
-    static float getOsc1DisplayHz() { return lastOsc1Hz.load (std::memory_order_relaxed); }
-    static float getOsc2DisplayHz() { return lastOsc2Hz.load (std::memory_order_relaxed); }
-
-    // Each filter's actual per-sample cutoff on the voice driving the scope — CUTOFF plus
-    // whatever the filter envelope currently adds, i.e. what the filter is doing right now,
-    // not just where the knob sits. Published once per block (after the per-sample filter
-    // loop), not per sample: the envelope moves on a millisecond timescale, so sampling it
-    // at the UI's 60Hz poll rate loses nothing audible or visible.
-    static float getFilter1LiveCutoffHz() { return lastFilter1Cutoff.load (std::memory_order_relaxed); }
-    static float getFilter2LiveCutoffHz() { return lastFilter2Cutoff.load (std::memory_order_relaxed); }
-
-    // Audio thread, once per processBlock: when no display voice is actively sounding,
-    // renderNextBlock never runs and the atomics above go stale — the dot would freeze at
-    // the last played value (or the startup default) and ignore CUTOFF knob moves made
-    // while idle. This publishes the base knob values instead whenever that's the case.
-    static void publishIdleCutoffs (float baseCutoff1, float baseCutoff2)
+    struct SharedState
     {
-        // Do not dereference displayVoice here. Voices can be destroyed while a host is
-        // resetting or removing a channel, and the audio callback may still observe the
-        // old pointer during that hand-off.
-        if (displayVoice.load (std::memory_order_relaxed) == nullptr)
+        std::atomic<float> lastPlayedHz { 0.0f };
+        std::atomic<SynthVoice*> displayVoice { nullptr };
+        std::atomic<float> lastOsc1Hz { 0.0f }, lastOsc2Hz { 0.0f };
+        std::atomic<float> lastFilter1Cutoff { 20000.0f }, lastFilter2Cutoff { 20000.0f };
+
+        void publishIdleCutoffs (float cutoff1, float cutoff2)
         {
-            lastFilter1Cutoff.store (baseCutoff1, std::memory_order_relaxed);
-            lastFilter2Cutoff.store (baseCutoff2, std::memory_order_relaxed);
+            if (displayVoice.load (std::memory_order_relaxed) == nullptr)
+            {
+                lastFilter1Cutoff.store (cutoff1, std::memory_order_relaxed);
+                lastFilter2Cutoff.store (cutoff2, std::memory_order_relaxed);
+            }
         }
-    }
+    };
+
+    explicit SynthVoice (SharedState& state) : sharedState (state) {}
 
     // Osc 2
     void setOsc2Enabled   (bool enabled);
@@ -87,7 +77,7 @@ public:
     void setOsc2FmParams  (float depth, float freq);
     void updateUnison2    (int numVoices, float detune);
     void update2          (float attack, float decay, float sustain, float release);
-    void updateFilter2    (float cutoff, float resonance, float envAmt, int type);
+    void updateFilter2    (float cutoff, float resonance, float envAmt, int type, int slope = 0);
     void updateFilterEnv2 (float attack, float decay, float sustain, float release);
     void updateOctave2    (int octaves);
     void updateOscPitch2  (float semitones);
@@ -108,6 +98,8 @@ private:
     FilterData filter;
     juce::dsp::Gain<float> gain;
 
+    int filterSlope { 0 };
+    int lastAppliedSlope { -1 };
     float filterEnvAmt { 0.0f };
     float filterCutoff { 20000.0f };
     float filterRes    { 0.1f };
@@ -126,6 +118,8 @@ private:
     FilterData filter2;
     juce::dsp::Gain<float> gain2;
 
+    int filterSlope2 { 0 };
+    int lastAppliedSlope2 { -1 };
     float filterEnvAmt2 { 0.0f };
     float filterCutoff2 { 20000.0f };
     float filterRes2    { 0.1f };
@@ -153,18 +147,8 @@ private:
 
     void updateOscFrequencies();
 
-    static std::atomic<float> lastPlayedHz;
-
-    // The most recently triggered voice owns the scope. Driving both the display audio and the
-    // published pitch from one place guarantees the window size and the waveform can never come
-    // from different notes.
-    static std::atomic<SynthVoice*> displayVoice;
-    static std::atomic<float> lastOsc1Hz;
-    static std::atomic<float> lastOsc2Hz;
-    static std::atomic<float> lastFilter1Cutoff;
-    static std::atomic<float> lastFilter2Cutoff;
-
-    bool isDisplayVoice() const { return displayVoice.load (std::memory_order_relaxed) == this; }
+    SharedState& sharedState;
+    bool isDisplayVoice() const { return sharedState.displayVoice.load (std::memory_order_relaxed) == this; }
 
     // True between noteOn and noteOff. Distinguishes a held note from one in its release tail,
     // so the scope can hand off from a released voice to one still being played.

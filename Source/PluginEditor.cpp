@@ -153,11 +153,11 @@ BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProc
     : AudioProcessorEditor (&p), audioProcessor (p),
       presetComponent  (audioProcessor.apvts, audioProcessor.presetManager),
       adsr             (audioProcessor.apvts, "ATTACK",           "DECAY",           "SUSTAIN",           "RELEASE",           "ENVELOPE"),
-      filterComponent  (audioProcessor.apvts, "FILTERTYPE",       "FILTERCUTOFF",    "FILTERRES",         "FILTERENVAMT"),
+      filterComponent  (audioProcessor.apvts, "FILTERTYPE",       "FILTERCUTOFF",    "FILTERRES",         "FILTERENVAMT", "FILTERSLOPE"),
       filterEnv        (audioProcessor.apvts, "FILTERENVATTACK",  "FILTERENVDECAY",  "FILTERENVSUSTAIN",  "FILTERENVRELEASE",  "FILTER ENV"),
       osc              (audioProcessor.apvts, "FMFREQ",           "FMDEPTH",         "UNISONVOICES",      "UNISONDETUNE"),
       adsr2            (audioProcessor.apvts, "ATTACK2",          "DECAY2",          "SUSTAIN2",          "RELEASE2",          "ENVELOPE"),
-      filterComponent2 (audioProcessor.apvts, "FILTERTYPE2",      "FILTERCUTOFF2",   "FILTERRES2",        "FILTERENVAMT2"),
+      filterComponent2 (audioProcessor.apvts, "FILTERTYPE2",      "FILTERCUTOFF2",   "FILTERRES2",        "FILTERENVAMT2", "FILTERSLOPE2"),
       filterEnv2       (audioProcessor.apvts, "FILTERENVATTACK2", "FILTERENVDECAY2", "FILTERENVSUSTAIN2", "FILTERENVRELEASE2", "FILTER ENV"),
       osc2             (audioProcessor.apvts, "FMFREQ2",          "FMDEPTH2",        "UNISONVOICES2",     "UNISONDETUNE2")
 {
@@ -377,6 +377,7 @@ static const juce::Colour kHotOutline { 0xffffb020 };
 
 void BlueSynthAudioProcessorEditor::timerCallback()
 {
+    presetComponent.refreshCurrentPresetName();
     audioProcessor.drainVisualizerAudio (osc1VisScratch, osc2VisScratch);
     applyVisualiserShaping (osc1VisScratch);
     applyVisualiserShaping (osc2VisScratch);
@@ -401,7 +402,9 @@ void BlueSynthAudioProcessorEditor::timerCallback()
         filterPanel.updateCurve ((int) raw (second ? "FILTERTYPE2"   : "FILTERTYPE"),
                                        raw (second ? "FILTERCUTOFF2" : "FILTERCUTOFF"),
                                        raw (second ? "FILTERRES2"    : "FILTERRES"),
-                                       liveCutoff, sr);
+                                       liveCutoff, sr, (int) raw (second ? "FILTERSLOPE2" : "FILTERSLOPE"));
+        filterComponent.updateSlopeLabels();
+        filterComponent2.updateSlopeLabels();
     }
 
     const auto clip = audioProcessor.fetchAndClearClipFlags();

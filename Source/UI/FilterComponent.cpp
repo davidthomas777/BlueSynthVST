@@ -17,7 +17,7 @@ FilterComponent::FilterComponent (juce::AudioProcessorValueTreeState& apvts,
                                    juce::String filterTypeId,
                                    juce::String cutoffId,
                                    juce::String resonanceId,
-                                   juce::String envAmtId)
+                                   juce::String envAmtId, juce::String slopeId)
 {
     filterTypeSelector.addItemList ({ "Low Pass", "High Pass", "Band Pass" }, 1);
     filterTypeSelector.setColour (juce::ComboBox::backgroundColourId, juce::Colour (0xff4A90E2));
@@ -26,10 +26,30 @@ FilterComponent::FilterComponent (juce::AudioProcessorValueTreeState& apvts,
     filterTypeSelector.setColour (juce::ComboBox::arrowColourId,      juce::Colours::white);
     filterTypeAttachment = std::make_unique<ComboBoxAttachment> (apvts, filterTypeId, filterTypeSelector);
     addAndMakeVisible (filterTypeSelector);
+    slopeSelector.addItemList ({ "12 dB/oct", "24 dB/oct", "36 dB/oct", "48 dB/oct" }, 1);
+    slopeSelector.setColour (juce::ComboBox::backgroundColourId, juce::Colour (0xff4A90E2));
+    slopeSelector.setColour (juce::ComboBox::textColourId, juce::Colours::white);
+    slopeSelector.setColour (juce::ComboBox::outlineColourId, juce::Colours::white);
+    slopeSelector.setColour (juce::ComboBox::arrowColourId, juce::Colours::white);
+    slopeAttachment = std::make_unique<ComboBoxAttachment> (apvts, slopeId, slopeSelector);
+    addAndMakeVisible (slopeSelector);
+    updateSlopeLabels();
 
     setSliderWithLabel (cutoffSlider,    cutoffLabel,    apvts, cutoffId,    cutoffAttachment);
     setSliderWithLabel (resonanceSlider, resonanceLabel, apvts, resonanceId, resonanceAttachment);
     setSliderWithLabel (envAmtSlider,    envAmtLabel,    apvts, envAmtId,    envAmtAttachment);
+}
+
+void FilterComponent::updateSlopeLabels()
+{
+    const int type = filterTypeSelector.getSelectedId();
+    if (type == slopeLabelType)
+        return;
+    slopeLabelType = type;
+    for (int i = 1; i <= 4; ++i)
+        slopeSelector.changeItemText (i, juce::String (i * (type == 3 ? 6 : 12)) + " dB/oct");
+    slopeSelector.setText (slopeSelector.getItemText (slopeSelector.getSelectedItemIndex()), juce::dontSendNotification);
+    slopeSelector.setTooltip (type == 3 ? "Slope on each side of the band-pass" : "Filter rolloff slope");
 }
 
 FilterComponent::~FilterComponent()
@@ -42,7 +62,7 @@ void FilterComponent::paint (juce::Graphics& g)
     g.setColour (juce::Colours::white);
     g.drawRect (getLocalBounds(), 1);
     g.setFont (appFont (12.0f));
-    g.drawText ("FILTER TYPE", getLocalBounds().reduced (6).withHeight (14), juce::Justification::centredLeft);
+    g.drawText ("FILTER TYPE / SLOPE", getLocalBounds().reduced (6).withHeight (14), juce::Justification::centredLeft);
 }
 
 void FilterComponent::resized()
@@ -54,7 +74,9 @@ void FilterComponent::resized()
     // Title text is drawn in paint() at bounds.getY() with height 14.
     // Combo box sits just below the title with a little extra breathing room.
     const auto typeComboY = bounds.getY() + labelHeight + 6;
-    filterTypeSelector.setBounds (bounds.getX(), typeComboY, bounds.getWidth(), comboHeight);
+    const int typeWidth = (bounds.getWidth() - 6) / 2;
+    filterTypeSelector.setBounds (bounds.getX(), typeComboY, typeWidth, comboHeight);
+    slopeSelector.setBounds (bounds.getX() + typeWidth + 6, typeComboY, bounds.getWidth() - typeWidth - 6, comboHeight);
 
     // Knob row, matching OscComponent's FM/unison knobs in both size and style (same
     // colours and LookAndFeel already; this makes the pixel size match too). OscComponent

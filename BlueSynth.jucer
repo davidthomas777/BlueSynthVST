@@ -54,6 +54,10 @@
             file="Source/UI/PianoComponent.cpp"/>
       <FILE id="PnCp2h" name="PianoComponent.h" compile="0" resource="0" file="Source/UI/PianoComponent.h"/>
     </GROUP>
+    <GROUP id="BsTests" name="Tests">
+      <FILE id="BsRegTests" name="RegressionTests.cpp" compile="0" resource="0" file="Tests/RegressionTests.cpp"/>
+      <FILE id="BsTestRun" name="run.sh" compile="0" resource="0" file="Tests/run.sh"/>
+    </GROUP>
   </MAINGROUP>
   <MODULES>
     <MODULE id="juce_animation" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>

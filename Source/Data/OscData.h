@@ -41,5 +41,7 @@ private:
     float fmDepth         { 0.0f };
     float fmOscFreq       { 0.0f };
     float carrierBaseFreq { 0.0f };
+    float sampleRateHz { 44100.0f };
+    bool wasFmActive { false };
 };
 

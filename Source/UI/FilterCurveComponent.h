@@ -26,7 +26,7 @@ public:
     // Repaints only when something actually changed. sampleRate is needed because the
     // real filter's response is warped by the bilinear transform (see magnitudeAt) — the
     // same cutoff in Hz looks different at 44.1kHz vs 48kHz.
-    void setParams (int filterType, float cutoffHz, float resonance, double sampleRate);
+    void setParams (int filterType, float cutoffHz, float resonance, double sampleRate, int slope);
 
     // The filter's actual per-sample cutoff right now (CUTOFF plus whatever the filter
     // envelope is currently adding), drawn as a dot sliding along the curve. When idle
@@ -55,8 +55,9 @@ private:
     // be exact (0.0000dB residual) across cutoff/frequency/type combinations spanning the
     // full audible range, where the old analog formula was off by up to ~27dB at high
     // cutoffs. Uses the same res -> Q mapping as FilterData::updateParams.
-    static float magnitudeAt (int filterType, float freq, float cutoffHz, float resonance, double sampleRate);
+    static float magnitudeAt (int filterType, float freq, float cutoffHz, float resonance, double sampleRate, int slope);
 
+    int    slope { 0 };
     int    type       { 0 };
     float  cutoff     { 20000.0f };
     float  res        { 0.1f };

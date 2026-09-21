@@ -12,6 +12,8 @@
 
 void OscData::prepareToPlay (juce::dsp::ProcessSpec& spec)
 {
+    sampleRateHz = (float) spec.sampleRate;
+    wasFmActive = false;
     fmOsc.prepare(spec);
     prepare(spec);
 
@@ -146,18 +148,25 @@ void OscData::getNextAudioBlock (juce::dsp::AudioBlock<float>& block)
 
     if (! fmActive)
     {
-        setFrequency (carrierBaseFreq);
+        setFrequency (carrierBaseFreq, wasFmActive);
+        wasFmActive = false;
         process (juce::dsp::ProcessContextReplacing<float> (block));
         return;
     }
 
     const int numSamples  = (int) block.getNumSamples();
+    wasFmActive = true;
     const int numChannels = (int) block.getNumChannels();
 
     for (int s = 0; s < numSamples; ++s)
     {
         float modSample = fmOsc.processSample (0.0f);
         float instFreq  = carrierBaseFreq + modSample * fmDepth;
+
+        // JUCE's phase accumulator only wraps forwards. A positive increment modulo
+        // the sample rate represents the same sampled phase motion as negative FM.
+        if (instFreq < 0.0f)
+            instFreq += sampleRateHz * std::ceil (-instFreq / sampleRateHz);
 
         setFrequency (instFreq, true);
         float carrierSample = processSample (0.0f);

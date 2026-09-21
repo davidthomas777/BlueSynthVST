@@ -8,11 +8,12 @@ A dual-oscillator subtractive/FM synthesizer plugin with per-oscillator oscillos
 
 - **Live oscilloscopes** — one per oscillator, pitch-synced so the waveform stays the same size at any note or octave, with clip indicators on the outline (amber = oscillator maxed, red = output clipping)
 - **Two independent oscillators**, each with 13 waveforms: Sine, Saw, Saw Inverse, Square, Triangle, Pulse 1, Pulse 2, Noise, Square (band-limited), Saw (band-limited), Rectified Sine, Trapezoid, and Stepped Saw
-- **Filter panel** — tabbed FILTER 1/2, Low Pass / High Pass / Band Pass per oscillator, with a live frequency-response curve that sweeps in real time with the filter envelope and a dot marking the current cutoff
+- **Filter panel** — tabbed FILTER 1/2 with independent type and slope selectors. Low Pass / High Pass offer 12, 24, 36, or 48 dB/oct; Band Pass offers 6, 12, 18, or 24 dB/oct per side. The live response curve follows the selected slope, resonance, and filter envelope.
+- **Filter compatibility** — existing presets and projects use the original two-pole response. Steeper slopes cascade up to four TPT stages, with resonance in the first stage and neutral additional stages; these are cascaded responses, not Butterworth-aligned higher-order filters. Higher slopes use more filter CPU.
 - **Per-oscillator FM**, unison up to 8 voices with detune, and ±4 octave / ±24 semitone tuning
 - **Per-oscillator ADSR** amplitude envelope, plus an independent filter envelope
 - **32-voice polyphony** with portamento/glide and a global pitch offset
-- **Preset system** — save, load, and delete presets from within the plugin
+- **Preset system** — save, load, and delete presets from within the plugin. Projects retain the selected preset name, including when its preset file is unavailable. Older projects without saved name metadata need the preset named once and the project saved again.
 - **On-screen piano** — 44 clickable keys (C2–G5), styled black-and-white to match the rest of the UI; plays through the same note path as MIDI input, so it works with no controller connected
 - **Zero added latency** — no lookahead or internal buffering, so end-to-end latency is whatever your audio buffer is set to
 
@@ -94,6 +95,10 @@ Source/
 - **Factory preset bank** shipped with the plugin
 
 CPU profiling notes and benchmark details are documented in [docs/cpu-profile-2026-09-06.md](docs/cpu-profile-2026-09-06.md).
+
+Run `bash Tests/run.sh` for the macOS regression suite covering FM output bounds, multiple plugin instances, preset state, filters, MIDI release behavior, and filter ADSR/amount behavior across sample rates and block sizes. See [Tests/README.md](Tests/README.md) for coverage and limitations.
+
+For a detailed explanation of the audio path, voice lifecycle, parameter system, UI, visualizer threading, presets, and extension points, see [docs/architecture.md](docs/architecture.md).
 
 ## License
 

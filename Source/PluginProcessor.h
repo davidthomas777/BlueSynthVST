@@ -11,6 +11,7 @@
 #include <JuceHeader.h>
 #include "Data/PresetManager.h"
 #include "Data/VisualizerBuffer.h"
+#include "SynthVoice.h"
 
 //==============================================================================
 /**
@@ -89,6 +90,8 @@ public:
     float getFilter2LiveCutoffHz() const;
 
 private:
+    // Outlives the voices: member destruction runs in reverse declaration order.
+    SynthVoice::SharedState voiceState;
     juce::Synthesiser synth;
     juce::AudioProcessorValueTreeState::ParameterLayout createParameters();
 

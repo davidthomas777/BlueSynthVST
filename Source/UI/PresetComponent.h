@@ -12,6 +12,7 @@ public:
 
     void paint   (juce::Graphics& g) override;
     void resized () override;
+    void refreshCurrentPresetName();
 
     void comboBoxChanged (juce::ComboBox* comboBoxThatHasChanged) override;
 
@@ -38,6 +39,7 @@ private:
     juce::TextButton saveButton   { "Save" };
     juce::TextButton deleteButton { "Delete" };
     juce::ComboBox   presetBox;
+    juce::String displayedPresetName;
 
     void refreshPresetList();
 

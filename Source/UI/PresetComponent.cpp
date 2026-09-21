@@ -123,14 +123,7 @@ PresetComponent::PresetComponent (juce::AudioProcessorValueTreeState& a, PresetM
     presetBox.setColour (juce::ComboBox::arrowColourId,      juce::Colours::white);
     refreshPresetList();
 
-    // Restore previously selected preset (survives editor close/reopen)
-    auto currentName = presetManager.getCurrentPresetName();
-    if (currentName.isNotEmpty())
-    {
-        auto idx = presetManager.getAllPresetNames().indexOf (currentName);
-        if (idx >= 0)
-            presetBox.setSelectedId (idx + 1, juce::dontSendNotification);
-    }
+    refreshCurrentPresetName();
 
     // Prev: cycle backwards with wraparound
     prevButton.onClick = [this]()
@@ -164,9 +157,9 @@ PresetComponent::PresetComponent (juce::AudioProcessorValueTreeState& a, PresetM
 
         dialog->enterModalState (
             true,
-            juce::ModalCallbackFunction::create ([this, dialog] (int result)
+            juce::ModalCallbackFunction::create ([safeThis = juce::Component::SafePointer<PresetComponent> (this), dialog] (int result)
             {
-                if (result == 1)
+                if (result == 1 && safeThis != nullptr)
                 {
                     auto name = dialog->getTextEditorContents ("name").trim();
                     // Strip characters that are illegal in filenames
@@ -174,13 +167,13 @@ PresetComponent::PresetComponent (juce::AudioProcessorValueTreeState& a, PresetM
 
                     if (name.isNotEmpty())
                     {
-                        presetManager.savePreset (apvts, name);
-                        refreshPresetList();
+                        safeThis->presetManager.savePreset (safeThis->apvts, name);
+                        safeThis->refreshPresetList();
 
-                        auto names = presetManager.getAllPresetNames();
+                        auto names = safeThis->presetManager.getAllPresetNames();
                         auto idx   = names.indexOf (name);
                         if (idx >= 0)
-                            presetBox.setSelectedId (idx + 1, juce::dontSendNotification);
+                            safeThis->presetBox.setSelectedId (idx + 1, juce::dontSendNotification);
                     }
                 }
                 delete dialog;
@@ -203,12 +196,12 @@ PresetComponent::PresetComponent (juce::AudioProcessorValueTreeState& a, PresetM
 
         confirm->enterModalState (
             true,
-            juce::ModalCallbackFunction::create ([this, name, confirm] (int result)
+            juce::ModalCallbackFunction::create ([safeThis = juce::Component::SafePointer<PresetComponent> (this), name, confirm] (int result)
             {
-                if (result == 1)
+                if (result == 1 && safeThis != nullptr)
                 {
-                    presetManager.deletePreset (name);
-                    refreshPresetList();
+                    safeThis->presetManager.deletePreset (name);
+                    safeThis->refreshPresetList();
                 }
                 delete confirm;
             }),
@@ -255,7 +248,8 @@ void PresetComponent::comboBoxChanged (juce::ComboBox* comboBoxThatHasChanged)
     {
         auto selectedText = presetBox.getText();
         if (selectedText.isNotEmpty())
-            presetManager.loadPreset (apvts, selectedText);
+            if (! presetManager.loadPreset (apvts, selectedText))
+                presetBox.setText (presetManager.getCurrentPresetName(), juce::dontSendNotification);
     }
 }
 
@@ -265,4 +259,17 @@ void PresetComponent::refreshPresetList()
     auto names = presetManager.getAllPresetNames();
     for (int i = 0; i < names.size(); ++i)
         presetBox.addItem (names[i], i + 1);
+    displayedPresetName = presetManager.getCurrentPresetName();
+    presetBox.setText (displayedPresetName, juce::dontSendNotification);
+}
+
+void PresetComponent::refreshCurrentPresetName()
+{
+    const auto name = presetManager.getCurrentPresetName();
+    // A selection's load callback is asynchronous; polling must not undo it first.
+    if (displayedPresetName != name)
+    {
+        displayedPresetName = name;
+        presetBox.setText (name, juce::dontSendNotification);
+    }
 }

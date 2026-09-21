@@ -20,7 +20,8 @@ public:
                      juce::String filterTypeId,
                      juce::String cutoffId,
                      juce::String resonanceId,
-                     juce::String envAmtId);
+                     juce::String envAmtId, juce::String slopeId);
+    void updateSlopeLabels();
     ~FilterComponent() override;
 
     void paint (juce::Graphics&) override;
@@ -33,6 +34,8 @@ private:
                              std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>& attachment);
 
     juce::ComboBox filterTypeSelector;
+    juce::ComboBox slopeSelector;
+    int slopeLabelType { -1 };
     juce::Slider   cutoffSlider;
     juce::Slider   resonanceSlider;
     juce::Slider   envAmtSlider;
@@ -45,6 +48,7 @@ private:
     using ComboBoxAttachment = juce::AudioProcessorValueTreeState::ComboBoxAttachment;
 
     std::unique_ptr<ComboBoxAttachment> filterTypeAttachment;
+    std::unique_ptr<ComboBoxAttachment> slopeAttachment;
     std::unique_ptr<SliderAttachment>   cutoffAttachment;
     std::unique_ptr<SliderAttachment>   resonanceAttachment;
     std::unique_ptr<SliderAttachment>   envAmtAttachment;

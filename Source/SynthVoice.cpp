@@ -10,19 +10,10 @@
 
 #include "SynthVoice.h"
 
-std::atomic<float> SynthVoice::lastPlayedHz { 0.0f };
-std::atomic<SynthVoice*> SynthVoice::displayVoice { nullptr };
-std::atomic<float> SynthVoice::lastOsc1Hz { 0.0f };
-std::atomic<float> SynthVoice::lastOsc2Hz { 0.0f };
-// 20000.0f here matches kFilterCutoffMax below — can't reference it directly, since static
-// member initializers run before that file-scope constant is declared.
-std::atomic<float> SynthVoice::lastFilter1Cutoff { 20000.0f };
-std::atomic<float> SynthVoice::lastFilter2Cutoff { 20000.0f };
-
 SynthVoice::~SynthVoice()
 {
     SynthVoice* expected = this;
-    displayVoice.compare_exchange_strong (expected, nullptr, std::memory_order_relaxed);
+    sharedState.displayVoice.compare_exchange_strong (expected, nullptr, std::memory_order_relaxed);
 }
 
 // Upper limit of the filter cutoff range. At this setting a low-pass is meant to be
@@ -45,15 +36,18 @@ bool SynthVoice::canPlaySound (juce::SynthesiserSound* sound) {
 
 void SynthVoice::startNote (int midiNoteNumber, float velocity, juce::SynthesiserSound *sound, int currentPitchWheelPosition) {
     targetHz = (float) juce::MidiMessage::getMidiNoteInHertz (midiNoteNumber);
-    float prev = lastPlayedHz.load();
+    float prev = sharedState.lastPlayedHz.load();
     if (portamentoTime > 0.001f && prev > 0.0f)
         currentHz = prev;
     else
         currentHz = targetHz;
-    lastPlayedHz.store (targetHz);
+    sharedState.lastPlayedHz.store (targetHz);
     noteHeld = true;
-    displayVoice.store (this, std::memory_order_relaxed);   // newest note claims the scope
+    sharedState.displayVoice.store (this, std::memory_order_relaxed);   // newest note claims the scope
     updateOscFrequencies();
+    // A newly assigned note must not inherit an unfinished envelope from the prior note.
+    adsr.reset();   filterAdsr.reset();
+    adsr2.reset();  filterAdsr2.reset();
     adsr.noteOn();  filterAdsr.noteOn();
     adsr2.noteOn(); filterAdsr2.noteOn();
 }
@@ -67,7 +61,7 @@ void SynthVoice::stopNote (float velocity, bool allowTailOff) {
     if (!allowTailOff || !anyActive)
     {
         SynthVoice* expected = this;
-        displayVoice.compare_exchange_strong (expected, nullptr, std::memory_order_relaxed);
+        sharedState.displayVoice.compare_exchange_strong (expected, nullptr, std::memory_order_relaxed);
         clearCurrentNote();
     }
 }
@@ -84,6 +78,11 @@ void SynthVoice::prepareToPlay (double sampleRate, int samplesPerBlock, int outp
     adsr2.setSampleRate (sampleRate);
     filterAdsr2.setSampleRate (sampleRate);
 
+    // JUCE's setSampleRate does not recalculate ADSR rates, and parameter caches may
+    // suppress the next update when a host changes rate without changing the knobs.
+    for (auto* envelope : { &adsr, &adsr2, &filterAdsr, &filterAdsr2 })
+        envelope->setParameters (envelope->getParameters());
+
     juce::dsp::ProcessSpec spec;
     spec.sampleRate       = sampleRate;
     spec.maximumBlockSize = samplesPerBlock;
@@ -93,11 +92,16 @@ void SynthVoice::prepareToPlay (double sampleRate, int samplesPerBlock, int outp
     for (auto& o : unisonOscs)  o.prepareToPlay (spec);
     for (auto& o : unisonOscs2) o.prepareToPlay (spec);
 
+    synthBuffer.setSize (outputChannels, samplesPerBlock);
     unisonTempBuffer.setSize (outputChannels, samplesPerBlock);
     osc2Buffer.setSize       (outputChannels, samplesPerBlock);
 
     filter.prepareToPlay  (spec);
     filter2.prepareToPlay (spec);
+    lastAppliedCutoff = lastAppliedCutoff2 = -1.0f;
+    lastAppliedRes = lastAppliedRes2 = -1.0f;
+    lastAppliedType = lastAppliedType2 = -1;
+    lastAppliedSlope = lastAppliedSlope2 = -1;
 
     gain.prepare  (spec);  gain.setGainLinear  (0.5f);
     gain2.prepare (spec);  gain2.setGainLinear (0.5f);
@@ -113,14 +117,16 @@ void SynthVoice::update2 (float attack, float decay, float sustain, float releas
     adsr2.updateADSR (attack, decay, sustain, release);
 }
 
-void SynthVoice::updateFilter (float cutoff, float resonance, float envAmt, int type) {
+void SynthVoice::updateFilter (float cutoff, float resonance, float envAmt, int type, int slope) {
     filterCutoff = cutoff;  filterRes = resonance;
     filterEnvAmt = envAmt;  filterType = type;
+    filterSlope = slope;
 }
 
-void SynthVoice::updateFilter2 (float cutoff, float resonance, float envAmt, int type) {
+void SynthVoice::updateFilter2 (float cutoff, float resonance, float envAmt, int type, int slope) {
     filterCutoff2 = cutoff;  filterRes2 = resonance;
     filterEnvAmt2 = envAmt;  filterType2 = type;
+    filterSlope2 = slope;
 }
 
 void SynthVoice::updateFilterEnv (float attack, float decay, float sustain, float release) {
@@ -186,8 +192,8 @@ void SynthVoice::updateOscFrequencies()
     // Runs every block, so the scope picks up octave and pitch changes immediately.
     if (isDisplayVoice())
     {
-        lastOsc1Hz.store (pitchedHz1, std::memory_order_relaxed);
-        lastOsc2Hz.store (pitchedHz2, std::memory_order_relaxed);
+        sharedState.lastOsc1Hz.store (pitchedHz1, std::memory_order_relaxed);
+        sharedState.lastOsc2Hz.store (pitchedHz2, std::memory_order_relaxed);
     }
 
     for (int i = 0; i < numUnisonVoices; ++i)
@@ -270,16 +276,15 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer, int st
     // the newest note of a chord leaves the display pointed at a dead voice and the trace goes
     // flat even though other notes are still sounding.
     //
-    // Safe to inspect another voice here: the Synthesiser renders every voice sequentially on
-    // the audio thread, so no other voice is mid-update while this runs.
-    if (auto* owner = displayVoice.load (std::memory_order_relaxed))
+    // The owner belongs to this processor; its Synthesiser renders these voices sequentially.
+    if (auto* owner = sharedState.displayVoice.load (std::memory_order_relaxed))
     {
         if (! owner->isVoiceActive() || (! owner->noteHeld && noteHeld))
-            displayVoice.store (this, std::memory_order_relaxed);
+            sharedState.displayVoice.store (this, std::memory_order_relaxed);
     }
     else
     {
-        displayVoice.store (this, std::memory_order_relaxed);
+        sharedState.displayVoice.store (this, std::memory_order_relaxed);
     }
 
     // ---- Portamento ----
@@ -325,9 +330,10 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer, int st
             if (filterIsBypassed (filterType, cutoff))
                 continue;
 
-            if (cutoff != lastAppliedCutoff || filterRes != lastAppliedRes || filterType != lastAppliedType)
+            if (cutoff != lastAppliedCutoff || filterRes != lastAppliedRes || filterType != lastAppliedType || filterSlope != lastAppliedSlope)
             {
-                filter.updateParams (cutoff, filterRes, filterType);
+                filter.updateParams (cutoff, filterRes, filterType, filterSlope);
+                lastAppliedSlope = filterSlope;
                 lastAppliedCutoff = cutoff;
                 lastAppliedRes    = filterRes;
                 lastAppliedType   = filterType;
@@ -337,7 +343,7 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer, int st
         }
 
         if (isDisplayVoice())
-            lastFilter1Cutoff.store (finalCutoff, std::memory_order_relaxed);
+            sharedState.lastFilter1Cutoff.store (finalCutoff, std::memory_order_relaxed);
 
         adsr.applyEnvelopeToBuffer (synthBuffer, 0, synthBuffer.getNumSamples());
 
@@ -349,7 +355,16 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer, int st
     }
     else
     {
-        for (int s = 0; s < numSamples; ++s) adsr.getNextSample();
+        float env = 0.0f;
+        for (int s = 0; s < numSamples; ++s)
+        {
+            adsr.getNextSample();
+            env = filterAdsr.getNextSample();
+        }
+        if (numSamples > 0 && isDisplayVoice())
+            sharedState.lastFilter1Cutoff.store (
+                juce::jlimit (20.0f, kFilterCutoffMax, filterCutoff + env * filterEnvAmt * kFilterCutoffMax),
+                std::memory_order_relaxed);
     }
 
     // ================================================================
@@ -378,9 +393,10 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer, int st
             if (filterIsBypassed (filterType2, cutoff))
                 continue;
 
-            if (cutoff != lastAppliedCutoff2 || filterRes2 != lastAppliedRes2 || filterType2 != lastAppliedType2)
+            if (cutoff != lastAppliedCutoff2 || filterRes2 != lastAppliedRes2 || filterType2 != lastAppliedType2 || filterSlope2 != lastAppliedSlope2)
             {
-                filter2.updateParams (cutoff, filterRes2, filterType2);
+                filter2.updateParams (cutoff, filterRes2, filterType2, filterSlope2);
+                lastAppliedSlope2 = filterSlope2;
                 lastAppliedCutoff2 = cutoff;
                 lastAppliedRes2    = filterRes2;
                 lastAppliedType2   = filterType2;
@@ -390,7 +406,7 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer, int st
         }
 
         if (isDisplayVoice())
-            lastFilter2Cutoff.store (finalCutoff2, std::memory_order_relaxed);
+            sharedState.lastFilter2Cutoff.store (finalCutoff2, std::memory_order_relaxed);
 
         adsr2.applyEnvelopeToBuffer (osc2Buffer, 0, osc2Buffer.getNumSamples());
 
@@ -406,7 +422,16 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer, int st
     }
     else
     {
-        for (int s = 0; s < numSamples; ++s) adsr2.getNextSample();
+        float env = 0.0f;
+        for (int s = 0; s < numSamples; ++s)
+        {
+            adsr2.getNextSample();
+            env = filterAdsr2.getNextSample();
+        }
+        if (numSamples > 0 && isDisplayVoice())
+            sharedState.lastFilter2Cutoff.store (
+                juce::jlimit (20.0f, kFilterCutoffMax, filterCutoff2 + env * filterEnvAmt2 * kFilterCutoffMax),
+                std::memory_order_relaxed);
     }
 
     // ================================================================
@@ -419,7 +444,7 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer, int st
     if (!anyActive)
     {
         SynthVoice* expected = this;
-        displayVoice.compare_exchange_strong (expected, nullptr, std::memory_order_relaxed);
+        sharedState.displayVoice.compare_exchange_strong (expected, nullptr, std::memory_order_relaxed);
         clearCurrentNote();
     }
 }

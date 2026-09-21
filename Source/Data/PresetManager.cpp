@@ -24,6 +24,7 @@ void PresetManager::ensurePresetDirectoryExists() const
 bool PresetManager::savePreset (juce::AudioProcessorValueTreeState& apvts, const juce::String& name)
 {
     auto state = apvts.copyState();
+    state.setProperty ("presetName", name, nullptr);
     std::unique_ptr<juce::XmlElement> xml (state.createXml());
     if (xml == nullptr)
         return false;
@@ -31,7 +32,7 @@ bool PresetManager::savePreset (juce::AudioProcessorValueTreeState& apvts, const
     auto file = getPresetDirectory().getChildFile (name + presetFileExtension);
     if (xml->writeTo (file))
     {
-        currentPresetName = name;
+        setCurrentPresetName (name);
         return true;
     }
     return false;
@@ -48,11 +49,25 @@ bool PresetManager::loadPreset (juce::AudioProcessorValueTreeState& apvts, const
         return false;
 
     auto state = juce::ValueTree::fromXml (*xml);
-    if (! state.isValid())
+    if (! state.hasType (apvts.state.getType()))
         return false;
 
+    for (const auto* id : { "FILTERSLOPE", "FILTERSLOPE2" })
+    {
+        if (! state.getChildWithProperty ("id", id).isValid())
+        {
+            juce::ValueTree parameter ("PARAM");
+            parameter.setProperty ("id", id, nullptr);
+            parameter.setProperty ("value", 0.0f, nullptr);
+            state.appendChild (parameter, nullptr);
+        }
+    }
+    state.setProperty ("presetName", name, nullptr);
+    // Parameter notifications can cause the host to request state during replacement.
+    setCurrentPresetName (name, false);
     apvts.replaceState (state);
-    currentPresetName = name;
+    if (onPresetChanged)
+        onPresetChanged();
     return true;
 }
 
@@ -64,8 +79,6 @@ bool PresetManager::deletePreset (const juce::String& name)
 
     if (file.deleteFile())
     {
-        if (currentPresetName == name)
-            currentPresetName = {};
         return true;
     }
     return false;

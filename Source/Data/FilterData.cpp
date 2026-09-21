@@ -12,44 +12,65 @@
 
 void FilterData::prepareToPlay (juce::dsp::ProcessSpec& spec)
 {
-    filter.prepare (spec);
-    filter.reset();
+    sampleRate = spec.sampleRate;
+    for (auto& filter : filters)
+        filter.prepare (spec);
+    reset();
+    lastCutoff = lastResonance = -1.0f;
 }
 
-void FilterData::updateParams (float cutoff, float resonance, int filterType)
+float FilterData::stageQ (float resonance, int stage)
 {
-    switch (filterType)
-    {
-        case 0: filter.setType (juce::dsp::StateVariableTPTFilterType::lowpass);  break;
-        case 1: filter.setType (juce::dsp::StateVariableTPTFilterType::highpass); break;
-        case 2: filter.setType (juce::dsp::StateVariableTPTFilterType::bandpass); break;
-        default: break;
-    }
+    // Only the first stage resonates, avoiding a compounded peak at higher slopes.
+    return stage == 0 ? juce::jmap (resonance, 0.0f, 1.0f, 0.707f, 20.0f) : 0.707f;
+}
 
-    if (cutoff != lastCutoff)
+void FilterData::updateParams (float cutoff, float resonance, int filterType, int slope)
+{
+    const int stages = juce::jlimit (1, 4, slope + 1);
+    const bool changed = stages != activeStages || filterType != type;
+    if (changed)
+        reset();
+    activeStages = stages;
+    type = filterType;
+    cutoff = juce::jlimit (1.0f, (float) (sampleRate * 0.499), cutoff);
+    for (int i = 0; i < activeStages; ++i)
     {
-        filter.setCutoffFrequency (cutoff);
-        lastCutoff = cutoff;
+        auto& filter = filters[(size_t) i];
+        filter.setType (type == 1 ? juce::dsp::StateVariableTPTFilterType::highpass
+                       : type == 2 ? juce::dsp::StateVariableTPTFilterType::bandpass
+                                   : juce::dsp::StateVariableTPTFilterType::lowpass);
+        if (changed || cutoff != lastCutoff)
+            filter.setCutoffFrequency (cutoff);
+        if (changed || resonance != lastResonance)
+            filter.setResonance (stageQ (resonance, i));
     }
-    // Map resonance 0..1 to Q 0.707..20
-    if (resonance != lastResonance)
-    {
-        filter.setResonance (juce::jmap (resonance, 0.0f, 1.0f, 0.707f, 20.0f));
-        lastResonance = resonance;
-    }
+    lastCutoff = cutoff;
+    lastResonance = resonance;
 }
 
 void FilterData::process (juce::dsp::AudioBlock<float>& audioBlock)
 {
-    filter.process (juce::dsp::ProcessContextReplacing<float> (audioBlock));
+    for (size_t channel = 0; channel < audioBlock.getNumChannels(); ++channel)
+        for (size_t sample = 0; sample < audioBlock.getNumSamples(); ++sample)
+            audioBlock.setSample ((int) channel, (int) sample,
+                                  processSample ((int) channel, audioBlock.getSample ((int) channel, (int) sample)));
 }
 
 float FilterData::processSample (int channel, float inputSample)
 {
-    return filter.processSample (channel, inputSample);
+    for (int i = 0; i < activeStages; ++i)
+    {
+        inputSample = filters[(size_t) i].processSample (channel, inputSample);
+        // Additional band-pass stages have unity gain at the centre frequency.
+        if (type == 2 && i > 0)
+            inputSample /= stageQ (0.0f, i);
+    }
+    return inputSample;
 }
 
 void FilterData::reset()
 {
-    filter.reset();
+    for (auto& filter : filters)
+        filter.reset();
 }

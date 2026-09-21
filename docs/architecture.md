@@ -150,9 +150,15 @@ Unison voices are rendered one at a time. Each voice is panned across the stereo
 
 ### Filters and envelopes
 
-`FilterData` wraps JUCE's `StateVariableTPTFilter<float>`. Filter type, cutoff, and resonance are mapped to the JUCE filter. Resonance values from 0 to 1 map to Q values from 0.707 to 20.
+`FilterData` holds four preallocated JUCE `StateVariableTPTFilter<float>` stages and processes one to four according to `FILTERSLOPE` / `FILTERSLOPE2`. Low-pass and high-pass slopes are 12/24/36/48 dB per octave; band-pass slopes are 6/12/18/24 dB per octave on each side. The first stage maps resonance from 0–1 to Q 0.707–20. Extra stages use Q 0.707, with band-pass centre gain normalized to unity. These cascaded responses do not use Butterworth stage alignment. Type or slope changes reset filter memory; cutoff changes retain it.
+
+The default uses one stage and preserves the original response. New slope parameters are appended to the parameter list, and preset/project loading inserts the default when an older state omits them. Each filter tab has separate type and slope controls; the response display multiplies the responses of the active stages.
 
 The filter envelope is evaluated per sample. Its amount is added to the base cutoff and clamped to 20 Hz–20 kHz. A low-pass filter at 20 kHz is bypassed because the TPT filter can ring at that setting; high-pass and band-pass filters remain active at 20 kHz.
+
+The mapping is `cutoff = clamp(baseCutoff + envelope * amount * 20000, 20, 20000)` in Hz. Positive amount raises cutoff; negative amount lowers it; zero amount leaves the audio unaffected by the filter ADSR. A positive sweep at a base cutoff of 20 kHz is pinned to the ceiling. This is a linear Hz offset, not an octave-based modulation scale.
+
+All four envelopes restart from zero for a newly assigned note. Filter envelopes keep advancing while their oscillator is disabled, just as the amplitude envelopes do. During preparation their rates are recalculated for the current sample rate even if the parameter values have not changed. The amplitude envelopes determine when a voice finishes, so a long filter release does not extend the audible note beyond its amplitude release.
 
 Filter coefficient caching avoids recalculating unchanged cutoff and resonance values. The filter curve uses the same Q mapping and an exact digital response calculation so its visual line agrees with the DSP filter.
 
@@ -170,7 +176,7 @@ The audio thread cannot safely call UI code. `VisualizerBuffer` provides the han
 
 The all-voice buffers are used for clip detection and are not drained by the UI. The display buffers hold a single voice because a chord's summed waveform does not have a stable period for a readable triggered scope.
 
-The display voice is represented by an atomic pointer. It is cleared when a voice finishes or is destroyed. The idle cutoff publisher never dereferences the pointer; this is important because hosts can remove or reset a plugin while an audio callback is handing off. That lifetime fix addressed the FL Studio access violation observed during channel insertion and reset.
+The processor owns a `SynthVoice::SharedState` that outlives its voices. It holds the display-voice pointer, display frequencies, filter cutoffs, and previous glide pitch. Each plugin instance has its own state, preventing display/glide interference and cross-instance voice-pointer access. The pointer is cleared when its voice finishes or is destroyed; only voices in the same synthesiser inspect it during sequential audio rendering.
 
 `OscilloscopeComponent` keeps a short ring of audio samples, chooses a window based on the selected voice's frequency, searches for a rising zero crossing, and min/max decimates samples into screen columns. The editor applies visual-only tanh shaping before pushing data into the scope. This shaping does not alter the plugin's audio output.
 
@@ -209,6 +215,12 @@ Parameters are created in `BlueSynthAudioProcessor::createParameters` and stored
 `getStateInformation` serializes the APVTS value tree to XML embedded in the host's plugin state. `setStateInformation` restores that tree when the host reloads a project.
 
 `PresetManager` stores named APVTS XML files in `~/Documents/BlueSynth/Presets/`. Saving copies the current value tree, loading replaces the APVTS state, and deleting removes the named XML file. Preset controls in the editor use this manager; host project state uses the processor state callbacks above.
+
+Host state includes a root `presetName` property, restored separately from the sound parameters. The editor polls the manager's name and updates its display without reloading a preset file, so project-specific tweaks and names of missing preset files are preserved. Name access is synchronized between state callbacks and the UI; the audio rendering path never accesses it. Older states without this property restore an empty name rather than inheriting a previous project's label.
+
+Selecting a preset installs its name before parameter replacement, then notifies the host that non-parameter state changed. Host program-name callbacks use the same name. UI polling compares against the last displayed manager name, not the pending ComboBox selection, so a timer tick cannot erase a selection before its asynchronous load callback. Deleting the preset file retains the current sound's name; parameter edits also retain it.
+
+State loading rejects XML roots other than `Parameters`. Save/delete dialog callbacks use a JUCE `SafePointer` so closing the editor before dismissing a dialog cannot access a destroyed preset component.
 
 ## Build and generated project files
 

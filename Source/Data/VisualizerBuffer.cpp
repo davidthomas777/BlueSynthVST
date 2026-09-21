@@ -15,6 +15,7 @@ void VisualizerBuffer::prepare (int samplesPerBlock, double sampleRate, int numC
     accumChannels = juce::jmax (1, numChannels);
     accumBuffer.setSize (accumChannels, samplesPerBlock);
     accumBuffer.clear();
+    monoScratch.resize ((size_t) samplesPerBlock);
 
     const int fifoCapacity = juce::jmax (samplesPerBlock * 4, (int) sampleRate);
     fifoStorage.assign ((size_t) fifoCapacity, 0.0f);
