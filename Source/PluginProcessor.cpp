@@ -149,6 +149,7 @@ void BlueSynthAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
     const int   unisonVoices = static_cast<int> (apvts.getRawParameterValue ("UNISONVOICES")->load());
     const float unisonDetune = apvts.getRawParameterValue ("UNISONDETUNE")->load();
     const float portamento   = apvts.getRawParameterValue ("PORTAMENTO")->load();
+    const bool  glideAlways  = apvts.getRawParameterValue ("GLIDEALWAYS")->load() >= 0.5f;
     const float pitch        = apvts.getRawParameterValue ("PITCH")->load();
 
     const float osc1Gain   = apvts.getRawParameterValue ("OSC1GAIN")->load();
@@ -206,7 +207,7 @@ void BlueSynthAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
             if (oscWaveChanged) voice->setOscWaveType (oscWaveChoice);
             voice->setOscFmParams   (fmDepth, fmFreq);
             voice->updateUnison     (unisonVoices, unisonDetune);
-            voice->updatePortamento (portamento);
+            voice->updatePortamento (portamento, glideAlways);
             voice->updatePitch      (pitch);
             if (adsrChanged) voice->update (attack, decay, sustain, release);
             voice->updateFilter     (filterCutoff, filterRes, filterEnvAmt, filterType,
@@ -306,7 +307,7 @@ void BlueSynthAudioProcessor::setStateInformation (const void* data, int sizeInB
         auto state = juce::ValueTree::fromXml (*xml);
         if (state.hasType (apvts.state.getType()))
         {
-            for (const auto* id : { "FILTERSLOPE", "FILTERSLOPE2" })
+            for (const auto* id : { "FILTERSLOPE", "FILTERSLOPE2", "GLIDEALWAYS" })
             {
                 if (! state.getChildWithProperty ("id", id).isValid())
                 {
@@ -428,5 +429,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout BlueSynthAudioProcessor::cre
 
     params.push_back (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { "FILTERSLOPE", 1 }, "Filter Slope", juce::StringArray { "2 poles", "4 poles", "6 poles", "8 poles" }, 0));
     params.push_back (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { "FILTERSLOPE2", 1 }, "Filter Slope 2", juce::StringArray { "2 poles", "4 poles", "6 poles", "8 poles" }, 0));
+
+    // Off: glide only between overlapping (legato) notes. On: glide into every note.
+    params.push_back (std::make_unique<juce::AudioParameterBool> (juce::ParameterID { "GLIDEALWAYS", 1 }, "Glide Always", false));
     return { params.begin(), params.end() };
 }

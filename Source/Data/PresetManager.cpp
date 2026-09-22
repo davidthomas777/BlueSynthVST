@@ -52,7 +52,7 @@ bool PresetManager::loadPreset (juce::AudioProcessorValueTreeState& apvts, const
     if (! state.hasType (apvts.state.getType()))
         return false;
 
-    for (const auto* id : { "FILTERSLOPE", "FILTERSLOPE2" })
+    for (const auto* id : { "FILTERSLOPE", "FILTERSLOPE2", "GLIDEALWAYS" })
     {
         if (! state.getChildWithProperty ("id", id).isValid())
         {

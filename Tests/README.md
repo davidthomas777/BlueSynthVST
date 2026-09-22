@@ -19,5 +19,7 @@ Coverage:
 - Filter ADSR attack/decay/sustain/release timing at 44.1/48/96 kHz and block sizes 1/17/128/512; positive/negative/zero amount, early note-off, zero-time stages, independent envelopes, and the 20 Hz/20 kHz limits.
 - Envelope progress while amount is zero, cutoff is clamped/bypassed, or an oscillator is disabled; fresh envelopes on voice reuse and MIDI all-sound-off; timing after a host sample-rate change.
 - Rendered audio consistency across block sizes, plus bit-identical audio when changing filter ADSR settings with zero amount.
+- A reused voice starts at the new note's pitch in its first block, rather than gliding from the previous note through the oscillator's frequency smoother.
+- Glide applies only to legato notes unless `GLIDEALWAYS` is on; it moves linearly in semitones and lands exactly on the target when the portamento time is up.
 
 These are offline regression checks, not a substitute for listening, FL Studio project round-trips, CPU benchmarking, or a full memory/thread sanitizer run. Preset dialog lifetime guards were reviewed separately; the suite does not automate native modal dialogs.

@@ -88,10 +88,10 @@ After the synthesiser renders, the processor applies master gain. It reads the a
 On note-on, `SynthVoice::startNote`:
 
 1. Converts the MIDI note to Hz.
-2. Uses the previous target frequency when glide is enabled.
+2. Starts a glide from the previous target pitch when the portamento time is non-zero and either another key is still held (legato, tracked by `BlueSynthesiser::heldKeys`) or `GLIDEALWAYS` is on. The glide is linear in semitones over exactly the portamento time, stepped once per block.
 3. Marks the voice as held.
 4. Claims the newest-note display slot for the oscilloscope.
-5. Computes oscillator frequencies, including pitch, octave, oscillator pitch, and unison detune.
+5. Computes oscillator frequencies, including pitch, octave, oscillator pitch, and unison detune, then forces each oscillator onto that frequency so a reused voice does not pass through JUCE's 50 ms frequency smoother.
 6. Triggers both amplitude and filter envelopes for both oscillators.
 
 On note-off, both amplitude and filter envelopes enter release. The voice is cleared once both oscillator amplitude envelopes are inactive. A display voice is cleared at the same time, which allows idle filter cutoff values to update safely.
@@ -174,6 +174,8 @@ The audio thread cannot safely call UI code. `VisualizerBuffer` provides the han
 4. At the end of the block, the processor folds channels to mono and writes the result into a `juce::AbstractFifo` ring buffer.
 5. The editor's 60 Hz timer drains the FIFO and feeds the oscilloscope components.
 
+The FIFO storage is allocated once at construction and never resized. `prepareToPlay` can run while the editor's timer is inside `drain()`, so reallocating there would be a use-after-free on the message thread.
+
 The all-voice buffers are used for clip detection and are not drained by the UI. The display buffers hold a single voice because a chord's summed waveform does not have a stable period for a readable triggered scope.
 
 The processor owns a `SynthVoice::SharedState` that outlives its voices. It holds the display-voice pointer, display frequencies, filter cutoffs, and previous glide pitch. Each plugin instance has its own state, preventing display/glide interference and cross-instance voice-pointer access. The pointer is cleared when its voice finishes or is destroyed; only voices in the same synthesiser inspect it during sequential audio rendering.
@@ -210,7 +212,7 @@ Parameters are created in `BlueSynthAudioProcessor::createParameters` and stored
 - `FILTERTYPE`, `FILTERSLOPE`, `FILTERCUTOFF`, `FILTERRES`, and `FILTERENVAMT`, with oscillator 2 equivalents (`FILTERSLOPE2` etc.). Slope choices are appended, index 0 is the original two-pole response.
 - Filter-envelope ADSR values for each oscillator.
 - `UNISONVOICES`, `UNISONDETUNE`, and oscillator 2 equivalents.
-- Global `PORTAMENTO`, `PITCH`, and `MASTERGAIN`.
+- Global `PORTAMENTO`, `GLIDEALWAYS`, `PITCH`, and `MASTERGAIN`. A state without `GLIDEALWAYS` restores it off.
 
 `getStateInformation` serializes the APVTS value tree to XML embedded in the host's plugin state. `setStateInformation` restores that tree when the host reloads a project.
 

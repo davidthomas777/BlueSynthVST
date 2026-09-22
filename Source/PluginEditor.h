@@ -39,6 +39,11 @@ private:
         void drawRotarySlider (juce::Graphics&, int x, int y, int width, int height,
                                float sliderPos, float rotaryStartAngle, float rotaryEndAngle,
                                juce::Slider&) override;
+        // Square, outlined, same look as the FILTER 1/2 tabs. Only the ALWAYS switch is a
+        // TextButton at this level; child components' buttons carry their own LookAndFeel.
+        void drawButtonBackground (juce::Graphics&, juce::Button&, const juce::Colour& backgroundColour,
+                                   bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown) override;
+        juce::Font getTextButtonFont (juce::TextButton&, int buttonHeight) override;
     };
 
     DownwardComboLookAndFeel editorLookAndFeel;
@@ -113,6 +118,7 @@ private:
     juce::Label  gainLabel;
     juce::Slider portamentoSlider;
     juce::Label  portamentoLabel;
+    juce::TextButton glideAlwaysButton { "ALWAYS" };   // latching; lit white when on, like a selected tab
     juce::Slider pitchSlider;
     juce::Label  pitchLabel;
 
@@ -122,6 +128,7 @@ private:
 
     std::unique_ptr<SliderAttachment>   gainAttachment;
     std::unique_ptr<SliderAttachment>   portamentoAttachment;
+    std::unique_ptr<ButtonAttachment>   glideAlwaysAttachment;
     std::unique_ptr<SliderAttachment>   pitchAttachment;
     std::unique_ptr<ComboBoxAttachment> waveSelectorAttachment;
     std::unique_ptr<ButtonAttachment>   osc1EnableAttachment;

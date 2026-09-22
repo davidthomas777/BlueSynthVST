@@ -457,6 +457,70 @@ static void filterEnvelopeAudio()
                  "Changing filter ADSR altered audio with zero envelope amount");
 }
 
+static void retriggerPitch()
+{
+    // A voice reused for a new note must start at the new pitch. juce::dsp::Oscillator
+    // smooths setFrequency() over 50ms, so without an explicit snap the second note here
+    // would begin near 131Hz and glide up, showing far too few zero-crossings in its first block.
+    BlueSynthAudioProcessor processor;
+    processor.prepareToPlay (44100.0, 128);
+    set (processor, "ATTACK",  0.0f);
+    set (processor, "RELEASE", 0.0f);   // a zero release frees the voice on note-off
+
+    render (processor, 48, true);        // C3, 130.8Hz
+    for (int i = 0; i < 20; ++i) render (processor);
+    render (processor, 48, false);
+    render (processor);
+
+    juce::AudioBuffer<float> buffer (2, 128);
+    juce::MidiBuffer midi;
+    midi.addEvent (juce::MidiMessage::noteOn (1, 84, 0.8f), 0);   // C6, 1046.5Hz
+    processor.processBlock (buffer, midi);
+
+    std::vector<int> crossings;
+    const auto* out = buffer.getReadPointer (0);
+    for (int i = 1; i < 128; ++i)
+        if (out[i - 1] < 0.0f && out[i] >= 0.0f)
+            crossings.push_back (i);
+
+    require (crossings.size() >= 2, "Retriggered voice did not start at the new pitch");
+    const int period = crossings[1] - crossings[0];
+    require (std::abs (period - 42) <= 2, "Retriggered voice period does not match the new note");
+}
+
+static void glideModes()
+{
+    BlueSynthAudioProcessor processor;
+    processor.prepareToPlay (44100.0, 128);
+    set (processor, "PORTAMENTO", 0.5f);
+
+    // Detached notes do not glide by default.
+    render (processor, 60, true);
+    render (processor, 60, false);
+    render (processor, 72, true);
+    require (std::abs (processor.getOsc1DisplayHz() - 523.25f) < 0.1f, "Detached note glided with ALWAYS off");
+    render (processor, 72, false);
+
+    // A legato note starts at the held note's pitch, is halfway in semitones at half the
+    // glide time (not halfway in Hz, which would be 392Hz), and lands exactly on the target.
+    render (processor, 60, true);
+    render (processor, 72, true);
+    require (std::abs (processor.getOsc1DisplayHz() - 261.63f) < 0.1f, "Legato note did not start at the previous pitch");
+    for (int i = 0; i < 86; ++i) render (processor);       // ~0.25s of a 0.5s glide
+    require (std::abs (processor.getOsc1DisplayHz() - 369.99f) < 2.0f, "Glide is not linear in semitones");
+    for (int i = 0; i < 90; ++i) render (processor);       // past the end of the glide
+    require (std::abs (processor.getOsc1DisplayHz() - 523.25f) < 0.01f, "Glide did not land on the target");
+    render (processor, 60, false);
+    render (processor, 72, false);
+
+    // With ALWAYS on, detached notes glide from the last note too.
+    set (processor, "GLIDEALWAYS", 1.0f);
+    render (processor, 60, true);
+    render (processor, 60, false);
+    render (processor, 72, true);
+    require (std::abs (processor.getOsc1DisplayHz() - 261.63f) < 0.1f, "Detached note did not glide with ALWAYS on");
+}
+
 int main()
 {
     juce::ScopedJuceInitialiser_GUI init;
@@ -470,7 +534,9 @@ int main()
                              std::make_pair ("Filter ADSR while oscillators are muted", filterEnvelopeMute),
                              std::make_pair ("Filter ADSR on voice reuse and hard stop", filterEnvelopeReuse),
                              std::make_pair ("Filter ADSR after sample-rate changes", filterEnvelopeSampleRate),
-                             std::make_pair ("Filter-envelope audio and block-size consistency", filterEnvelopeAudio) })
+                             std::make_pair ("Filter-envelope audio and block-size consistency", filterEnvelopeAudio),
+                             std::make_pair ("Voice reuse starts at the new pitch", retriggerPitch),
+                             std::make_pair ("Legato-only and always glide modes", glideModes) })
     {
         try { test.second(); std::cout << "PASS " << test.first << '\n'; }
         catch (const std::exception& e) { ++failures; std::cerr << "FAIL " << test.first << ": " << e.what() << '\n'; }
