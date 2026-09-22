@@ -41,9 +41,11 @@ static constexpr int kOscKnobH  = 95;
 static constexpr int kSideY = kWaveY;
 static constexpr int kSideH = 660;
 
-// Master-knob boxes (smaller than before: 70×70)
+// Master-knob boxes. 14px taller than the knob needs so GLIDE has a bottom row for its
+// ALWAYS switch; GAIN and PITCH leave that row empty so all three knobs stay aligned.
 static constexpr int kBoxW = 70;
-static constexpr int kBoxH = 70;
+static constexpr int kBoxH = 86;
+static constexpr int kBoxSwitchRowH = 16;
 static constexpr int kBoxGap = 4;
 
 // On-screen piano — sits directly under the two oscillator columns, matching their
@@ -148,6 +150,29 @@ juce::PopupMenu::Options BlueSynthAudioProcessorEditor::DownwardComboLookAndFeel
         .withStandardItemHeight (label.getHeight());
 }
 
+void BlueSynthAudioProcessorEditor::DownwardComboLookAndFeel::drawButtonBackground (
+    juce::Graphics& g, juce::Button& button, const juce::Colour& backgroundColour,
+    bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown)
+{
+    auto colour = backgroundColour.withMultipliedAlpha (button.isEnabled() ? 1.0f : 0.5f);
+
+    if (shouldDrawButtonAsDown)
+        colour = colour.contrasting (0.2f);
+    else if (shouldDrawButtonAsHighlighted)
+        colour = colour.contrasting (0.05f);
+
+    g.setColour (colour);
+    g.fillRect (button.getLocalBounds());
+
+    g.setColour (juce::Colours::white);
+    g.drawRect (button.getLocalBounds(), 1);
+}
+
+juce::Font BlueSynthAudioProcessorEditor::DownwardComboLookAndFeel::getTextButtonFont (juce::TextButton&, int)
+{
+    return appFont (10.0f);   // the default scales with height and is unreadable in a 16px row
+}
+
 //==============================================================================
 BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProcessor& p)
     : AudioProcessorEditor (&p), audioProcessor (p),
@@ -203,6 +228,17 @@ BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProc
     addAndMakeVisible (portamentoSlider);
     styleLabel (portamentoLabel, "GLIDE");
     addAndMakeVisible (portamentoLabel);
+
+    // Serum-style: glide is legato-only unless ALWAYS is on. Drawn like the FILTER tabs:
+    // outlined when off, filled white with blue text when on.
+    glideAlwaysButton.setClickingTogglesState (true);
+    glideAlwaysButton.setTooltip ("Glide into every note, not just overlapping (legato) ones");
+    glideAlwaysButton.setColour (juce::TextButton::buttonColourId,   juce::Colour (0xff4A90E2));
+    glideAlwaysButton.setColour (juce::TextButton::buttonOnColourId, juce::Colours::white);
+    glideAlwaysButton.setColour (juce::TextButton::textColourOffId,  juce::Colours::white);
+    glideAlwaysButton.setColour (juce::TextButton::textColourOnId,   juce::Colour (0xff4A90E2));
+    glideAlwaysAttachment = std::make_unique<ButtonAttachment> (audioProcessor.apvts, "GLIDEALWAYS", glideAlwaysButton);
+    addAndMakeVisible (glideAlwaysButton);
 
     styleKnob (pitchSlider);
     pitchAttachment = std::make_unique<SliderAttachment> (audioProcessor.apvts, "PITCH", pitchSlider);
@@ -486,15 +522,19 @@ void BlueSynthAudioProcessorEditor::resized()
     const int box2X = box1X - kBoxGap - kBoxW;
     const int box3X = box2X - kBoxGap - kBoxW;
 
+    // Label (10px) + 2px gap, knob with its readout, then the switch row at the bottom.
+    // Returns that bottom row; only GLIDE puts something in it.
     auto layoutKnob = [](juce::Rectangle<int> box, juce::Label& lbl, juce::Slider& sld)
     {
         auto inner = box.reduced (3);   // minimal padding so slider gets max room
-        lbl.setBounds (inner.withHeight (10));
-        sld.setBounds (inner.withTrimmedTop (12));  // label (10px) + 2px gap
+        lbl.setBounds (inner.removeFromTop (10));
+        auto switchRow = inner.removeFromBottom (kBoxSwitchRowH);
+        sld.setBounds (inner.withTrimmedTop (2));
+        return switchRow;
     };
     layoutKnob ({ box3X, kBoxY, kBoxW, kBoxH }, gainLabel,       gainSlider);
-    layoutKnob ({ box2X, kBoxY, kBoxW, kBoxH }, portamentoLabel, portamentoSlider);
     layoutKnob ({ box1X, kBoxY, kBoxW, kBoxH }, pitchLabel,      pitchSlider);
+    glideAlwaysButton.setBounds (layoutKnob ({ box2X, kBoxY, kBoxW, kBoxH }, portamentoLabel, portamentoSlider));
 
     // Preset bar — spans both columns
     presetComponent.setBounds (kCol1X, kPresetY, kCol2X + kColW - kCol1X, 24);

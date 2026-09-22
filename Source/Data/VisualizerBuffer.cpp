@@ -17,9 +17,11 @@ void VisualizerBuffer::prepare (int samplesPerBlock, double sampleRate, int numC
     accumBuffer.clear();
     monoScratch.resize ((size_t) samplesPerBlock);
 
-    const int fifoCapacity = juce::jmax (samplesPerBlock * 4, (int) sampleRate);
-    fifoStorage.assign ((size_t) fifoCapacity, 0.0f);
-    fifo.setTotalSize (fifoCapacity);
+    juce::ignoreUnused (sampleRate);
+
+    // The FIFO is deliberately left alone: its storage is fixed-size, and resetting it here
+    // could race a drain() in progress on the message thread. Whatever it still holds is at
+    // most a second of stale audio, which the next drain discards.
 }
 
 void VisualizerBuffer::prepareBlock (int numSamples)

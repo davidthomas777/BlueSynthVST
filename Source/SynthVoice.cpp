@@ -34,17 +34,38 @@ bool SynthVoice::canPlaySound (juce::SynthesiserSound* sound) {
     return dynamic_cast<juce::SynthesiserSound*>(sound) != nullptr;
 }
 
+static inline float hzToSemitones (float hz)   { return 69.0f + 12.0f * std::log2 (hz / 440.0f); }
+static inline float semitonesToHz (float semi) { return 440.0f * std::pow (2.0f, (semi - 69.0f) / 12.0f); }
+
 void SynthVoice::startNote (int midiNoteNumber, float velocity, juce::SynthesiserSound *sound, int currentPitchWheelPosition) {
     targetHz = (float) juce::MidiMessage::getMidiNoteInHertz (midiNoteNumber);
-    float prev = sharedState.lastPlayedHz.load();
-    if (portamentoTime > 0.001f && prev > 0.0f)
-        currentHz = prev;
+    const float prev = sharedState.lastPlayedHz.load();
+
+    // BlueSynthesiser has already set this note's own bit, so "more than one" means another
+    // key was still down: a legato note. Serum-style, that is the only time glide applies
+    // unless the ALWAYS switch is on.
+    const bool legato = sharedState.heldKeys.count() > 1;
+    if (portamentoTime > 0.001f && prev > 0.0f && (glideAlways || legato))
+    {
+        glideStartSemi    = hzToSemitones (prev);
+        glideEndSemi      = (float) midiNoteNumber;
+        glideTotalSamples = juce::jmax (1, (int) std::lround (portamentoTime * storedSampleRate));
+        glideDoneSamples  = 0;
+        currentHz         = prev;
+    }
     else
-        currentHz = targetHz;
+    {
+        glideTotalSamples = 0;
+        currentHz         = targetHz;
+    }
     sharedState.lastPlayedHz.store (targetHz);
     noteHeld = true;
     sharedState.displayVoice.store (this, std::memory_order_relaxed);   // newest note claims the scope
     updateOscFrequencies();
+    // Nor may it inherit the previous note's pitch: without this every reused voice slides
+    // into its new frequency over the oscillator's 50ms smoother, even with portamento off.
+    for (auto& o : unisonOscs)  o.snapFrequency();
+    for (auto& o : unisonOscs2) o.snapFrequency();
     // A newly assigned note must not inherit an unfinished envelope from the prior note.
     adsr.reset();   filterAdsr.reset();
     adsr2.reset();  filterAdsr2.reset();
@@ -172,7 +193,7 @@ void SynthVoice::setVisualizerTargets (VisualizerBuffer* osc1Target,        Visu
     osc2DisplayVisTarget = osc2DisplayTarget;
 }
 
-void SynthVoice::updatePortamento (float time)      { portamentoTime       = time; }
+void SynthVoice::updatePortamento (float time, bool always) { portamentoTime = time; glideAlways = always; }
 void SynthVoice::updatePitch      (float semitones) { pitchOffsetSemitones = semitones; }
 void SynthVoice::updateOctave     (int octaves)      { octave1 = octaves; }
 void SynthVoice::updateOctave2    (int octaves)      { octave2 = octaves; }
@@ -288,10 +309,13 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer, int st
     }
 
     // ---- Portamento ----
-    if (portamentoTime > 0.001f)
+    // Pitch is stepped once per block, at the value the glide has reached by the block's
+    // first sample; the final block lands exactly on the target.
+    if (glideDoneSamples < glideTotalSamples)
     {
-        float coeff = std::exp (-(float)numSamples / (portamentoTime * (float)storedSampleRate));
-        currentHz   = targetHz + (currentHz - targetHz) * coeff;
+        const float t = (float) glideDoneSamples / (float) glideTotalSamples;
+        currentHz = semitonesToHz (glideStartSemi + (glideEndSemi - glideStartSemi) * t);
+        glideDoneSamples += numSamples;
     }
     else
     {

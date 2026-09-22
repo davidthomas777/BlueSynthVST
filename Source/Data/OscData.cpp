@@ -181,6 +181,11 @@ void OscData::setWaveFrequencyHz (float baseHz, float detuneSemitones)
     carrierBaseFreq = baseHz * std::pow (2.0f, detuneSemitones / 12.0f);
 }
 
+void OscData::snapFrequency()
+{
+    setFrequency (carrierBaseFreq, true);
+}
+
 void OscData::setFmParams (const float depth, const float freq)
 {
     fmOsc.setFrequency (freq);

@@ -50,6 +50,10 @@ private:
     int accumChannels { 1 };
     std::vector<float> monoScratch;   // channel fold-down, reused to avoid per-block allocation
 
-    juce::AbstractFifo fifo { 1 };
-    std::vector<float> fifoStorage;
+    // Sized once, at construction, and never reallocated: prepare() can run while the editor's
+    // timer is inside drain(), so resizing here would pull the storage out from under the reader.
+    // 1<<17 samples holds a second of audio at up to 131kHz, or 4 blocks of 32768.
+    static constexpr int fifoCapacity = 1 << 17;
+    juce::AbstractFifo fifo { fifoCapacity };
+    std::vector<float> fifoStorage = std::vector<float> ((size_t) fifoCapacity, 0.0f);
 };

@@ -92,7 +92,7 @@ public:
 private:
     // Outlives the voices: member destruction runs in reverse declaration order.
     SynthVoice::SharedState voiceState;
-    juce::Synthesiser synth;
+    BlueSynthesiser synth { voiceState };
     juce::AudioProcessorValueTreeState::ParameterLayout createParameters();
 
     // --- Clip-detection taps: all-voices-summed, mono, per oscillator. Never drained;

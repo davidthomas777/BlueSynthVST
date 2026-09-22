@@ -11,6 +11,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include <bitset>
 #include "SynthSound.h"
 #include "Data/AdsrData.h"
 #include "Data/OscData.h"
@@ -38,7 +39,7 @@ public:
     void setOscWaveType  (int choice);
     void setOscFmParams  (float depth, float freq);
     void updateUnison    (int numVoices, float detune);
-    void updatePortamento (float time);
+    void updatePortamento (float time, bool always);
     void updatePitch      (float semitones);
     void updateOctave     (int octaves);
     void updateOscPitch   (float semitones);
@@ -57,6 +58,11 @@ public:
         std::atomic<SynthVoice*> displayVoice { nullptr };
         std::atomic<float> lastOsc1Hz { 0.0f }, lastOsc2Hz { 0.0f };
         std::atomic<float> lastFilter1Cutoff { 20000.0f }, lastFilter2Cutoff { 20000.0f };
+
+        // Keys physically down right now, maintained by BlueSynthesiser on the audio thread.
+        // A note-on that arrives while another key is held is legato, which is the only case
+        // glide applies to unless GLIDEALWAYS is on.
+        std::bitset<128> heldKeys;
 
         void publishIdleCutoffs (float cutoff1, float cutoff2)
         {
@@ -142,8 +148,16 @@ private:
     float currentHz            { 0.0f };
     float targetHz             { 0.0f };
     float portamentoTime       { 0.0f };
+    bool  glideAlways          { false };
     float pitchOffsetSemitones { 0.0f };
     double storedSampleRate    { 44100.0 };
+
+    // Glide runs linearly in semitones so an octave takes the same time and sounds the same
+    // at any register, arriving exactly when portamentoTime is up. Fixed at note start.
+    float glideStartSemi   { 0.0f };
+    float glideEndSemi     { 0.0f };
+    int   glideTotalSamples { 0 };
+    int   glideDoneSamples  { 0 };
 
     void updateOscFrequencies();
 
@@ -161,4 +175,35 @@ private:
     VisualizerBuffer* osc2VisTarget { nullptr };
     VisualizerBuffer* osc1DisplayVisTarget { nullptr };
     VisualizerBuffer* osc2DisplayVisTarget { nullptr };
+};
+
+// Records which keys are down before the base class hands a note to a voice, so startNote
+// can tell a legato note from a fresh attack. Everything here runs on the audio thread.
+class BlueSynthesiser : public juce::Synthesiser
+{
+public:
+    explicit BlueSynthesiser (SynthVoice::SharedState& state) : sharedState (state) {}
+
+    void noteOn (int midiChannel, int midiNoteNumber, float velocity) override
+    {
+        if (juce::isPositiveAndBelow (midiNoteNumber, 128))
+            sharedState.heldKeys.set ((size_t) midiNoteNumber);
+        juce::Synthesiser::noteOn (midiChannel, midiNoteNumber, velocity);
+    }
+
+    void noteOff (int midiChannel, int midiNoteNumber, float velocity, bool allowTailOff) override
+    {
+        if (juce::isPositiveAndBelow (midiNoteNumber, 128))
+            sharedState.heldKeys.reset ((size_t) midiNoteNumber);
+        juce::Synthesiser::noteOff (midiChannel, midiNoteNumber, velocity, allowTailOff);
+    }
+
+    void allNotesOff (int midiChannel, bool allowTailOff) override
+    {
+        sharedState.heldKeys.reset();
+        juce::Synthesiser::allNotesOff (midiChannel, allowTailOff);
+    }
+
+private:
+    SynthVoice::SharedState& sharedState;
 };

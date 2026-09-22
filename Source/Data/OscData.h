@@ -20,6 +20,11 @@ public:
     void setFmParams (const float depth, const float frequency);
     void setWaveFrequencyHz     (float baseHz, float detuneSemitones);
 
+    // Jumps straight to the current base frequency, bypassing the 50ms smoother
+    // juce::dsp::Oscillator applies to every non-forced setFrequency(). Call on note start:
+    // a reused voice otherwise glides from its previous pitch into the new one.
+    void snapFrequency();
+
 private:
     static float sineForPhase (float x) noexcept
     {

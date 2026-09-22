@@ -51,7 +51,7 @@ Steeper slopes use more stages and CPU. The default reproduces the original two-
 
 - **32-note polyphony**, with voice stealing enabled by the current JUCE default. Releases occupy voices too.
 - Up to 16 carriers per note when both banks use eight-way unison.
-- Global portamento from 0–2 seconds, with glide history local to each plugin instance.
+- Global glide from 0–2 seconds, Serum-style: legato notes only unless ALWAYS is on, linear in semitones, with glide history local to each plugin instance.
 - A 44-key piano sends notes through the host MIDI path. It spans MIDI notes 36–79 and labels middle C as C3.
 - Mono and stereo output layouts.
 
@@ -125,7 +125,7 @@ After adding, removing or renaming source files, update the .jucer project and r
 bash Tests/run.sh
 ```
 
-The runner builds Shared Code and executes **10 regression groups** for FM output, instance isolation, preset state, filters, MIDI releases and filter envelopes. It does not install plugins or modify preset files. Processor construction may create the preset directory if absent.
+The runner builds Shared Code and executes **12 regression groups** for FM output, instance isolation, preset state, filters, MIDI releases, filter envelopes, voice-reuse pitch and glide modes. It does not install plugins or modify preset files. Processor construction may create the preset directory if absent.
 
 See [test coverage and limitations](Tests/README.md). Offline passes do not establish FL Studio project compatibility, perceived sound quality or a CPU ceiling.
 
