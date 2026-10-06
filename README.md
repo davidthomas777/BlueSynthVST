@@ -52,10 +52,13 @@ Steeper slopes use more stages and CPU. The default reproduces the original two-
 - **32-note polyphony**, with voice stealing enabled by the current JUCE default. Releases occupy voices too.
 - Up to 16 carriers per note when both banks use eight-way unison.
 - Global glide from 0–2 seconds, Serum-style: legato notes only unless ALWAYS is on, linear in semitones, with glide history local to each plugin instance.
+- Glide retains its original host automation mapping; the editor uses linear knob travel. Saved glide durations remain in seconds. Normalized automation authored with the short-lived 0–1-second linear mapping cannot be distinguished automatically and may need adjustment.
 - A 44-key piano sends notes through the host MIDI path. It spans MIDI notes 36–79 and labels middle C as C3.
 - Mono and stereo output layouts.
 
 Velocity-sensitive gain, pitch-wheel modulation, custom MIDI CC mappings and MPE are not implemented. JUCE handles standard note/pedal behavior, but pedal edge cases are not yet covered by the regression suite.
+
+Master/oscillator gain and base filter cutoff/resonance changes use 10 ms ramps. Carrier pitch changes use 50 ms smoothing with or without FM; new notes start at their assigned pitch. Filter-envelope timing and its linear-Hz amount mapping are unchanged. Waveform, filter-type/slope, oscillator-enable and FM-depth switches are not crossfaded by this smoothing pass.
 
 ### Presets and project recall
 
@@ -127,7 +130,7 @@ After adding, removing or renaming source files, update the .jucer project and r
 bash Tests/run.sh
 ```
 
-The runner builds Shared Code and executes **12 regression groups** for FM output, instance isolation, preset state, filters, MIDI releases, filter envelopes, voice-reuse pitch and glide modes. It does not install plugins or modify preset files. Processor construction may create the preset directory if absent.
+The runner builds Shared Code and executes **17 regression groups** for FM output, instance isolation, preset state, filters, MIDI releases, filter envelopes, voice-reuse pitch, glide compatibility and parameter smoothing. It does not install plugins or modify preset files. Processor construction may create the preset directory if absent.
 
 See [test coverage and limitations](Tests/README.md). Offline passes do not establish FL Studio project compatibility, perceived sound quality or a CPU ceiling.
 

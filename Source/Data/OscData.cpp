@@ -13,7 +13,8 @@
 void OscData::prepareToPlay (juce::dsp::ProcessSpec& spec)
 {
     sampleRateHz = (float) spec.sampleRate;
-    wasFmActive = false;
+    carrierFrequency.reset (spec.sampleRate, 0.05);
+    carrierFrequency.setCurrentAndTargetValue (carrierBaseFreq);
     fmOsc.prepare(spec);
     prepare(spec);
 
@@ -146,22 +147,20 @@ void OscData::getNextAudioBlock (juce::dsp::AudioBlock<float>& block)
 {
     const bool fmActive = (fmDepth != 0.0f && fmOscFreq != 0.0f);
 
-    if (! fmActive)
+    if (! fmActive && ! carrierFrequency.isSmoothing())
     {
-        setFrequency (carrierBaseFreq, wasFmActive);
-        wasFmActive = false;
+        setFrequency (carrierBaseFreq, true);
         process (juce::dsp::ProcessContextReplacing<float> (block));
         return;
     }
 
     const int numSamples  = (int) block.getNumSamples();
-    wasFmActive = true;
     const int numChannels = (int) block.getNumChannels();
 
     for (int s = 0; s < numSamples; ++s)
     {
-        float modSample = fmOsc.processSample (0.0f);
-        float instFreq  = carrierBaseFreq + modSample * fmDepth;
+        const float modSample = fmActive ? fmOsc.processSample (0.0f) : 0.0f;
+        float instFreq = carrierFrequency.getNextValue() + modSample * fmDepth;
 
         // JUCE's phase accumulator only wraps forwards. A positive increment modulo
         // the sample rate represents the same sampled phase motion as negative FM.
@@ -179,10 +178,12 @@ void OscData::getNextAudioBlock (juce::dsp::AudioBlock<float>& block)
 void OscData::setWaveFrequencyHz (float baseHz, float detuneSemitones)
 {
     carrierBaseFreq = baseHz * std::pow (2.0f, detuneSemitones / 12.0f);
+    carrierFrequency.setTargetValue (carrierBaseFreq);
 }
 
 void OscData::snapFrequency()
 {
+    carrierFrequency.setCurrentAndTargetValue (carrierBaseFreq);
     setFrequency (carrierBaseFreq, true);
 }
 

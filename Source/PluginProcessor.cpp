@@ -77,6 +77,8 @@ void   BlueSynthAudioProcessor::changeProgramName (int, const juce::String& name
 //==============================================================================
 void BlueSynthAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
+    masterGain.reset (sampleRate, 0.01);
+    masterGain.setCurrentAndTargetValue (apvts.getRawParameterValue ("MASTERGAIN")->load());
     synth.setCurrentPlaybackSampleRate (sampleRate);
 
     for (int i = 0; i < synth.getNumVoices(); ++i)
@@ -242,7 +244,8 @@ void BlueSynthAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
     osc2Display.prepareBlock (buffer.getNumSamples());
 
     synth.renderNextBlock (buffer, midiMessages, 0, buffer.getNumSamples());
-    buffer.applyGain (apvts.getRawParameterValue ("MASTERGAIN")->load());
+    masterGain.setTargetValue (apvts.getRawParameterValue ("MASTERGAIN")->load());
+    masterGain.applyGain (buffer, buffer.getNumSamples());
 
     // After rendering: if no display voice is sounding, keep the visualizer's live-cutoff
     // atomics tracking the CUTOFF knobs so the curve dot doesn't freeze at a stale value.
@@ -379,11 +382,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout BlueSynthAudioProcessor::cre
     params.push_back (std::make_unique<juce::AudioParameterFloat> ("FILTERENVRELEASE", "Filter Env Release", juce::NormalisableRange<float> {0.0f, 3.0f, 0.01f}, 0.4f));
     params.push_back (std::make_unique<juce::AudioParameterInt>   ("UNISONVOICES", "Unison Voices", 1, 8, 1));
     params.push_back (std::make_unique<juce::AudioParameterFloat> ("UNISONDETUNE", "Unison Detune", juce::NormalisableRange<float> {0.0f, 1.0f, 0.01f}, 0.0f));
-    // Linear, not skewed: the 0.01 interval fixes the reachable values at {0, 0.01, ... 1.00}
-    // whatever the skew is, so a skew adds no resolution — it only redistributes those steps
-    // along the knob. The old 0.3 skew put 0.01 a fifth of the way around the arc, so the
-    // first step off zero jumped visibly.
-    params.push_back (std::make_unique<juce::AudioParameterFloat> ("PORTAMENTO", "Portamento", juce::NormalisableRange<float> {0.0f, 1.0f, 0.01f}, 0.0f));
+    // Preserve the original host automation mapping; the editor uses linear knob travel.
+    params.push_back (std::make_unique<juce::AudioParameterFloat> ("PORTAMENTO", "Portamento", juce::NormalisableRange<float> {0.0f, 2.0f, 0.01f, 0.3f}, 0.0f));
     {
         juce::NormalisableRange<float> r (-24.0f, 24.0f,
             [](float s,float e,float v){return s+v*(e-s);}, [](float s,float e,float v){return (v-s)/(e-s);},

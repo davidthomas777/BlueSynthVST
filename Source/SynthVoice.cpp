@@ -66,6 +66,12 @@ void SynthVoice::startNote (int midiNoteNumber, float velocity, juce::Synthesise
     // into its new frequency over the oscillator's 50ms smoother, even with portamento off.
     for (auto& o : unisonOscs)  o.snapFrequency();
     for (auto& o : unisonOscs2) o.snapFrequency();
+    gain.reset();
+    gain2.reset();
+    cutoffSmooth.setCurrentAndTargetValue (filterCutoff);
+    cutoffSmooth2.setCurrentAndTargetValue (filterCutoff2);
+    resonanceSmooth.setCurrentAndTargetValue (filterRes);
+    resonanceSmooth2.setCurrentAndTargetValue (filterRes2);
     // A newly assigned note must not inherit an unfinished envelope from the prior note.
     adsr.reset();   filterAdsr.reset();
     adsr2.reset();  filterAdsr2.reset();
@@ -126,6 +132,10 @@ void SynthVoice::prepareToPlay (double sampleRate, int samplesPerBlock, int outp
 
     gain.prepare  (spec);  gain.setGainLinear  (0.5f);
     gain2.prepare (spec);  gain2.setGainLinear (0.5f);
+    gain.setRampDurationSeconds (0.01);
+    gain2.setRampDurationSeconds (0.01);
+    for (auto* smooth : { &cutoffSmooth, &cutoffSmooth2, &resonanceSmooth, &resonanceSmooth2 })
+        smooth->reset (sampleRate, 0.01);
 
     isPrepared = true;
 }
@@ -142,12 +152,16 @@ void SynthVoice::updateFilter (float cutoff, float resonance, float envAmt, int 
     filterCutoff = cutoff;  filterRes = resonance;
     filterEnvAmt = envAmt;  filterType = type;
     filterSlope = slope;
+    cutoffSmooth.setTargetValue (cutoff);
+    resonanceSmooth.setTargetValue (resonance);
 }
 
 void SynthVoice::updateFilter2 (float cutoff, float resonance, float envAmt, int type, int slope) {
     filterCutoff2 = cutoff;  filterRes2 = resonance;
     filterEnvAmt2 = envAmt;  filterType2 = type;
     filterSlope2 = slope;
+    cutoffSmooth2.setTargetValue (cutoff);
+    resonanceSmooth2.setTargetValue (resonance);
 }
 
 void SynthVoice::updateFilterEnv (float attack, float decay, float sustain, float release) {
@@ -346,7 +360,8 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer, int st
         for (int s = 0; s < synthBuffer.getNumSamples(); ++s)
         {
             float env    = filterAdsr.getNextSample();
-            float cutoff = juce::jlimit (20.0f, kFilterCutoffMax, filterCutoff + env * filterEnvAmt * kFilterCutoffMax);
+            float cutoff = juce::jlimit (20.0f, kFilterCutoffMax, cutoffSmooth.getNextValue() + env * filterEnvAmt * kFilterCutoffMax);
+            const float resonance = resonanceSmooth.getNextValue();
             finalCutoff  = cutoff;
 
             // The envelope still has to advance every sample even when nothing is filtered,
@@ -354,12 +369,12 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer, int st
             if (filterIsBypassed (filterType, cutoff))
                 continue;
 
-            if (cutoff != lastAppliedCutoff || filterRes != lastAppliedRes || filterType != lastAppliedType || filterSlope != lastAppliedSlope)
+            if (cutoff != lastAppliedCutoff || resonance != lastAppliedRes || filterType != lastAppliedType || filterSlope != lastAppliedSlope)
             {
-                filter.updateParams (cutoff, filterRes, filterType, filterSlope);
+                filter.updateParams (cutoff, resonance, filterType, filterSlope);
                 lastAppliedSlope = filterSlope;
                 lastAppliedCutoff = cutoff;
-                lastAppliedRes    = filterRes;
+                lastAppliedRes    = resonance;
                 lastAppliedType   = filterType;
             }
             for (int ch = 0; ch < synthBuffer.getNumChannels(); ++ch)
@@ -384,10 +399,13 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer, int st
         {
             adsr.getNextSample();
             env = filterAdsr.getNextSample();
+            cutoffSmooth.getNextValue();
+            resonanceSmooth.getNextValue();
+            gain.processSample (0.0f);
         }
         if (numSamples > 0 && isDisplayVoice())
             sharedState.lastFilter1Cutoff.store (
-                juce::jlimit (20.0f, kFilterCutoffMax, filterCutoff + env * filterEnvAmt * kFilterCutoffMax),
+                juce::jlimit (20.0f, kFilterCutoffMax, cutoffSmooth.getCurrentValue() + env * filterEnvAmt * kFilterCutoffMax),
                 std::memory_order_relaxed);
     }
 
@@ -411,18 +429,19 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer, int st
         for (int s = 0; s < osc2Buffer.getNumSamples(); ++s)
         {
             float env    = filterAdsr2.getNextSample();
-            float cutoff = juce::jlimit (20.0f, kFilterCutoffMax, filterCutoff2 + env * filterEnvAmt2 * kFilterCutoffMax);
+            float cutoff = juce::jlimit (20.0f, kFilterCutoffMax, cutoffSmooth2.getNextValue() + env * filterEnvAmt2 * kFilterCutoffMax);
+            const float resonance = resonanceSmooth2.getNextValue();
             finalCutoff2 = cutoff;
 
             if (filterIsBypassed (filterType2, cutoff))
                 continue;
 
-            if (cutoff != lastAppliedCutoff2 || filterRes2 != lastAppliedRes2 || filterType2 != lastAppliedType2 || filterSlope2 != lastAppliedSlope2)
+            if (cutoff != lastAppliedCutoff2 || resonance != lastAppliedRes2 || filterType2 != lastAppliedType2 || filterSlope2 != lastAppliedSlope2)
             {
-                filter2.updateParams (cutoff, filterRes2, filterType2, filterSlope2);
+                filter2.updateParams (cutoff, resonance, filterType2, filterSlope2);
                 lastAppliedSlope2 = filterSlope2;
                 lastAppliedCutoff2 = cutoff;
-                lastAppliedRes2    = filterRes2;
+                lastAppliedRes2    = resonance;
                 lastAppliedType2   = filterType2;
             }
             for (int ch = 0; ch < osc2Buffer.getNumChannels(); ++ch)
@@ -451,10 +470,13 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer, int st
         {
             adsr2.getNextSample();
             env = filterAdsr2.getNextSample();
+            cutoffSmooth2.getNextValue();
+            resonanceSmooth2.getNextValue();
+            gain2.processSample (0.0f);
         }
         if (numSamples > 0 && isDisplayVoice())
             sharedState.lastFilter2Cutoff.store (
-                juce::jlimit (20.0f, kFilterCutoffMax, filterCutoff2 + env * filterEnvAmt2 * kFilterCutoffMax),
+                juce::jlimit (20.0f, kFilterCutoffMax, cutoffSmooth2.getCurrentValue() + env * filterEnvAmt2 * kFilterCutoffMax),
                 std::memory_order_relaxed);
     }
 

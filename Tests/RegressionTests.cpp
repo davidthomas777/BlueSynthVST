@@ -342,7 +342,10 @@ static void filterEnvelopeStages()
     set (limits.processor, "FILTERENVAMT", 0.1f);
     set (limits.processor, "FILTERENVAMT2", 0.1f);
     limits.samples (1);
-    limits.cutoff (7625.0f, 7625.0f, "Envelope froze at a clamped/bypassed cutoff");
+    // The base cutoff now ramps for 10ms; envelope progress must remain independent.
+    limits.cutoff (20000.0f, 2635.0f, "Envelope froze at a clamped/bypassed cutoff");
+    limits.seconds (0.01);
+    limits.cutoff (7250.0f, 7250.0f, "Base cutoff smoothing changed the envelope timeline");
 }
 
 static void filterEnvelopeMute()
@@ -521,6 +524,229 @@ static void glideModes()
     require (std::abs (processor.getOsc1DisplayHz() - 261.63f) < 0.1f, "Detached note did not glide with ALWAYS on");
 }
 
+static void glideCompatibility()
+{
+    BlueSynthAudioProcessor source;
+    auto* parameter = source.apvts.getParameter ("PORTAMENTO");
+    const juce::NormalisableRange<float> legacyRange { 0.0f, 2.0f, 0.01f, 0.3f };
+    for (float normalised : { 0.0f, 0.1f, 0.25f, 0.5f, 0.75f, 1.0f })
+        require (std::abs (parameter->convertFrom0to1 (normalised)
+                          - legacyRange.snapToLegalValue (legacyRange.convertFrom0to1 (normalised))) < 0.0001f,
+                 "Legacy glide automation mapping changed");
+
+    for (float seconds : { 0.0f, 0.37f, 1.0f, 1.75f, 2.0f })
+    {
+        set (source, "PORTAMENTO", seconds);
+        juce::MemoryBlock state;
+        source.getStateInformation (state);
+        BlueSynthAudioProcessor restored;
+        restored.setStateInformation (state.getData(), (int) state.getSize());
+        require (std::abs (restored.apvts.getRawParameterValue ("PORTAMENTO")->load() - seconds) < 0.001f,
+                 "Saved glide duration did not survive restoration");
+    }
+    {
+        std::unique_ptr<juce::AudioProcessorEditor> editor (source.createEditor());
+        juce::Slider* glide = nullptr;
+        for (auto* child : editor->getChildren())
+            if (auto* slider = dynamic_cast<juce::Slider*> (child))
+                if (slider->getMinimum() == 0.0 && slider->getMaximum() == 2.0)
+                    glide = slider;
+        require (glide != nullptr, "Glide editor range does not include two seconds");
+        require (std::abs (glide->valueToProportionOfLength (1.0) - 0.5) < 0.0001,
+                 "Glide knob travel is not linear independently of the host mapping");
+        glide->setValue (1.75, juce::sendNotificationSync);
+        require (std::abs (parameter->convertFrom0to1 (parameter->getValue()) - 1.75f) < 0.001f,
+                 "Linear glide knob wrote the wrong host value");
+        set (source, "PORTAMENTO", 2.0f);
+        require (std::abs (glide->getValue() - 2.0) < 0.001, "Host glide change did not reach the editor");
+    }
+    source.prepareToPlay (48000.0, 128);
+    set (source, "GLIDEALWAYS", 1.0f);
+    render (source, 60);
+    render (source, 72);
+    for (int i = 0; i < 375; ++i) render (source);
+    require (std::abs (source.getOsc1DisplayHz() - 369.994f) < 0.2f,
+             "Two-second glide did not retain its duration");
+    for (int i = 0; i < 375; ++i) render (source);
+    require (std::abs (source.getOsc1DisplayHz() - 523.251f) < 0.02f,
+             "Two-second glide did not reach its target");
+}
+
+static void gainSmoothing()
+{
+    for (const char* gainId : { "MASTERGAIN", "OSC1GAIN", "OSC2GAIN" })
+        for (double rate : { 32000.0, 44100.0, 48000.0, 96000.0 })
+            for (int blockSize : { 1, 17, 128, 512 })
+            {
+                BlueSynthAudioProcessor reference, changed;
+                for (auto* p : { &reference, &changed })
+                {
+                    set (*p, "MASTERGAIN", 1.0f);
+                    set (*p, "OSC1GAIN", 1.0f);
+                    set (*p, "OSC2GAIN", 1.0f);
+                    const bool second = juce::String (gainId) == "OSC2GAIN";
+                    set (*p, "OSC1ENABLED", second ? 0.0f : 1.0f);
+                    set (*p, "OSC2ENABLED", second ? 1.0f : 0.0f);
+                    for (const char* id : { "ATTACK", "ATTACK2", "DECAY", "DECAY2" }) set (*p, id, 0.0f);
+                    for (const char* id : { "SUSTAIN", "SUSTAIN2" }) set (*p, id, 1.0f);
+                    // Preparing twice also checks that ramp timing follows a rate change.
+                    p->prepareToPlay (22050.0, blockSize);
+                    p->prepareToPlay (rate, blockSize);
+                    render (*p, 69);
+                }
+                set (changed, gainId, 0.0f);
+                const int rampSamples = (int) std::floor (rate * 0.01);
+                for (int offset = 0; offset < rampSamples + 100;)
+                {
+                    const int count = juce::jmin (blockSize, rampSamples + 100 - offset);
+                    juce::AudioBuffer<float> a (2, count), b (2, count);
+                    juce::MidiBuffer midi;
+                    reference.processBlock (a, midi);
+                    changed.processBlock (b, midi);
+                    for (int ch = 0; ch < 2; ++ch)
+                        for (int s = 0; s < count; ++s)
+                        {
+                            const float expectedGain = juce::jmax (0.0f, 1.0f - (offset + s + 1.0f) / rampSamples);
+                            require (std::abs (b.getSample (ch, s) - a.getSample (ch, s) * expectedGain) < 0.00003f,
+                                     "Gain automation did not follow the 10ms stereo ramp");
+                        }
+                    offset += count;
+                }
+            }
+}
+
+static void cutoffSmoothing()
+{
+    for (double rate : { 32000.0, 44100.0, 48000.0, 96000.0 })
+        for (int block : { 1, 17, 128, 512 })
+        {
+            EnvelopeRig rig (rate, block);
+            for (const char* suffix : { "", "2" })
+            {
+                rig.parameter ("FILTERENVAMT", suffix, 0.0f);
+                rig.parameter ("FILTERCUTOFF", suffix, 1000.0f);
+            }
+            rig.samples (1, 60);
+            rig.cutoff (1000.0f, 1000.0f, "New note inherited a stale cutoff ramp");
+            set (rig.processor, "FILTERCUTOFF", 9000.0f);
+            set (rig.processor, "FILTERCUTOFF2", 5000.0f);
+            set (rig.processor, "OSC2ENABLED", 0.0f);
+            const int rampSamples = (int) std::floor (rate * 0.01);
+            rig.samples (rampSamples / 2);
+            const float t = (float) (rampSamples / 2) / rampSamples;
+            rig.cutoff (1000.0f + 8000.0f * t, 1000.0f + 4000.0f * t,
+                        "Cutoff ramp timing depends on buffer size or mute state");
+            rig.samples (rampSamples - rampSamples / 2);
+            set (rig.processor, "OSC2ENABLED", 1.0f);
+            rig.samples (1);
+            rig.cutoff (9000.0f, 5000.0f, "Cutoff ramp failed to reach the target");
+        }
+}
+
+static void pitchSmoothing()
+{
+    for (double rate : { 32000.0, 44100.0, 48000.0, 96000.0 })
+        for (bool fm : { false, true })
+        {
+            OscData oscillator;
+            juce::dsp::ProcessSpec spec { rate, 1, 2 };
+            oscillator.setWaveType (0);
+            oscillator.prepareToPlay (spec);
+            oscillator.setWaveFrequencyHz (220.0f, 0.0f);
+            oscillator.snapFrequency();
+            if (fm) oscillator.setFmParams (0.001f, 1.0f);
+            oscillator.setWaveFrequencyHz (880.0f, 0.0f);
+            juce::AudioBuffer<float> buffer (2, 1);
+            juce::dsp::AudioBlock<float> audio (buffer);
+            const int length = (int) std::floor (rate * 0.05);
+            for (int sample = 0; sample < length; ++sample)
+            {
+                // Switching FM off midway must not snap a moving pitch to its target.
+                if (fm && sample == length / 2) oscillator.setFmParams (0.0f, 0.0f);
+                buffer.clear();
+                oscillator.getNextAudioBlock (audio);
+                const float expected = 220.0f + 660.0f * (sample + 1.0f) / length;
+                require (std::abs (oscillator.getFrequency() - expected) < 0.1f,
+                         "Pitch ramp jumped, restarted, or bypassed smoothing under FM");
+                require (buffer.getSample (0, 0) == buffer.getSample (1, 0), "Pitch ramp advanced twice for stereo");
+            }
+            oscillator.setWaveFrequencyHz (440.0f, 0.0f);
+            oscillator.snapFrequency();
+            require (std::abs (oscillator.getFrequency() - 440.0f) < 0.01f, "Note-start pitch snap was lost");
+        }
+}
+
+static std::vector<float> automatedAudio (double rate, int blockSize, bool fm)
+{
+    EnvelopeRig rig (rate, blockSize);
+    for (const char* suffix : { "", "2" })
+    {
+        rig.parameter ("FILTERENVAMT", suffix, 0.0f);
+        rig.parameter ("FILTERCUTOFF", suffix, 1000.0f);
+        rig.parameter ("FILTERRES", suffix, 0.3f);
+    }
+    if (fm)
+    {
+        set (rig.processor, "FMFREQ", 40.0f);
+        set (rig.processor, "FMDEPTH", 50.0f);
+    }
+    std::vector<float> result;
+    for (int event = 0; event < 6; ++event)
+    {
+        if (event > 0)
+        {
+            const bool rising = event % 2 != 0;
+            set (rig.processor, "FILTERCUTOFF", rising ? 8000.0f : 2000.0f);
+            set (rig.processor, "FILTERCUTOFF2", rising ? 2000.0f : 8000.0f);
+            set (rig.processor, "FILTERRES", rising ? 0.8f : 0.2f);
+            set (rig.processor, "FILTERRES2", rising ? 0.2f : 0.8f);
+            set (rig.processor, "MASTERGAIN", rising ? 0.8f : 0.3f);
+            set (rig.processor, "OSC1GAIN", rising ? 0.3f : 0.8f);
+            set (rig.processor, "OSC2GAIN", rising ? 0.8f : 0.3f);
+            set (rig.processor, "PITCH", rising ? 7.0f : -5.0f);
+            set (rig.processor, "OSC2ENABLED", event == 2 ? 0.0f : 1.0f);
+        }
+        // Retarget before the 10ms ramp has finished, then allow the last target to settle.
+        int remaining = (int) (rate * (event == 0 || event == 5 ? 0.08 : 0.003));
+        bool first = true;
+        while (remaining > 0)
+        {
+            const int count = juce::jmin (remaining, blockSize);
+            juce::AudioBuffer<float> buffer (2, count);
+            juce::MidiBuffer midi;
+            if (event == 0 && first) midi.addEvent (juce::MidiMessage::noteOn (1, 60, 0.8f), 0);
+            rig.processor.processBlock (buffer, midi);
+            for (int s = 0; s < count; ++s)
+                for (int ch = 0; ch < 2; ++ch)
+                {
+                    const float value = buffer.getSample (ch, s);
+                    require (std::isfinite (value), "Automation produced non-finite audio");
+                    result.push_back (value);
+                }
+            first = false;
+            remaining -= count;
+        }
+    }
+    return result;
+}
+
+static void automationConsistency()
+{
+    for (double rate : { 44100.0, 48000.0, 96000.0 })
+        for (bool fm : { false, true })
+        {
+            const auto reference = automatedAudio (rate, 1, fm);
+            for (int block : { 17, 128, 512 })
+            {
+                const auto actual = automatedAudio (rate, block, fm);
+                require (actual.size() == reference.size(), "Automation render length changed");
+                for (size_t i = 0; i < actual.size(); ++i)
+                    require (std::abs (actual[i] - reference[i]) < 0.0001f,
+                             "Gain/filter/pitch automation audio depends on buffer size");
+            }
+        }
+}
+
 int main()
 {
     juce::ScopedJuceInitialiser_GUI init;
@@ -536,7 +762,12 @@ int main()
                              std::make_pair ("Filter ADSR after sample-rate changes", filterEnvelopeSampleRate),
                              std::make_pair ("Filter-envelope audio and block-size consistency", filterEnvelopeAudio),
                              std::make_pair ("Voice reuse starts at the new pitch", retriggerPitch),
-                             std::make_pair ("Legato-only and always glide modes", glideModes) })
+                             std::make_pair ("Legato-only and always glide modes", glideModes),
+                             std::make_pair ("Legacy glide mapping and long state recall", glideCompatibility),
+                             std::make_pair ("Master and oscillator gain smoothing", gainSmoothing),
+                             std::make_pair ("Cutoff smoothing and muted progress", cutoffSmoothing),
+                             std::make_pair ("Pitch smoothing with FM transitions", pitchSmoothing),
+                             std::make_pair ("Rapid automation audio across buffer sizes", automationConsistency) })
     {
         try { test.second(); std::cout << "PASS " << test.first << '\n'; }
         catch (const std::exception& e) { ++failures; std::cerr << "FAIL " << test.first << ": " << e.what() << '\n'; }

@@ -276,6 +276,7 @@ BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProc
 
     styleKnob (portamentoSlider);
     portamentoAttachment = std::make_unique<SliderAttachment> (audioProcessor.apvts, "PORTAMENTO", portamentoSlider);
+    portamentoSlider.setNormalisableRange (juce::NormalisableRange<double> { 0.0, 2.0, 0.01 });
     portamentoSlider.setNumDecimalPlacesToDisplay (2);
     addAndMakeVisible (portamentoSlider);
     styleLabel (portamentoLabel, "GLIDE");

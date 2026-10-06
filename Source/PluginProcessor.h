@@ -90,6 +90,7 @@ public:
     float getFilter2LiveCutoffHz() const;
 
 private:
+    juce::SmoothedValue<float> masterGain;
     // Outlives the voices: member destruction runs in reverse declaration order.
     SynthVoice::SharedState voiceState;
     BlueSynthesiser synth { voiceState };

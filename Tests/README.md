@@ -21,5 +21,10 @@ Coverage:
 - Rendered audio consistency across block sizes, plus bit-identical audio when changing filter ADSR settings with zero amount.
 - A reused voice starts at the new note's pitch in its first block, rather than gliding from the previous note through the oscillator's frequency smoother.
 - Glide applies only to legato notes unless `GLIDEALWAYS` is on; it moves linearly in semitones and lands exactly on the target when the portamento time is up.
+- Legacy glide normalization, saved durations through two seconds, a two-second glide trajectory, and linear editor travel with correct bidirectional parameter attachment.
+- Master and both oscillator gain ramps: per-sample stereo output against an unsmoothed reference, at 32/44.1/48/96 kHz and buffer sizes 1/17/128/512, including preparation at a different sample rate.
+- Base-cutoff ramp timing, new-note initialization and progress while muted across those rates and buffer sizes; filter-envelope timing remains independent of the base ramp.
+- Carrier pitch ramps with and without FM, switching FM off mid-ramp, and note-start pitch snapping at four sample rates.
+- Rendered audio consistency across buffer sizes during rapid gain, cutoff, resonance and pitch automation, including interrupted ramps and oscillator muting, with and without FM.
 
 These are offline regression checks, not a substitute for listening, FL Studio project round-trips, CPU benchmarking, or a full memory/thread sanitizer run. Preset dialog lifetime guards were reviewed separately; the suite does not automate native modal dialogs.

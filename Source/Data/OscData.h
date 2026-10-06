@@ -20,8 +20,8 @@ public:
     void setFmParams (const float depth, const float frequency);
     void setWaveFrequencyHz     (float baseHz, float detuneSemitones);
 
-    // Jumps straight to the current base frequency, bypassing the 50ms smoother
-    // juce::dsp::Oscillator applies to every non-forced setFrequency(). Call on note start:
+    // Jumps straight to the current base frequency, bypassing the 50ms smoother.
+    // Call on note start:
     // a reused voice otherwise glides from its previous pitch into the new one.
     void snapFrequency();
 
@@ -46,7 +46,7 @@ private:
     float fmDepth         { 0.0f };
     float fmOscFreq       { 0.0f };
     float carrierBaseFreq { 0.0f };
+    juce::SmoothedValue<float> carrierFrequency;
     float sampleRateHz { 44100.0f };
-    bool wasFmActive { false };
 };
 

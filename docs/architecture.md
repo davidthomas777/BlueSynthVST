@@ -91,7 +91,7 @@ On note-on, `SynthVoice::startNote`:
 2. Starts a glide from the previous target pitch when the portamento time is non-zero and either another key is still held (legato, tracked by `BlueSynthesiser::heldKeys`) or `GLIDEALWAYS` is on. The glide is linear in semitones over exactly the portamento time, stepped once per block.
 3. Marks the voice as held.
 4. Claims the newest-note display slot for the oscilloscope.
-5. Computes oscillator frequencies, including pitch, octave, oscillator pitch, and unison detune, then forces each oscillator onto that frequency so a reused voice does not pass through JUCE's 50 ms frequency smoother.
+5. Computes oscillator frequencies, including pitch, octave, oscillator pitch, and unison detune, then snaps each oscillator's carrier smoother to that frequency. Gain and base filter smoothers also snap to the current settings so a reused voice does not inherit another note's unfinished parameter ramps.
 6. Triggers both amplitude and filter envelopes for both oscillators.
 
 On note-off, both amplitude and filter envelopes enter release. The voice is cleared once both oscillator amplitude envelopes are inactive. A display voice is cleared at the same time, which allows idle filter cutoff values to update safely.
@@ -140,7 +140,7 @@ The two oscillator chains are independent until the final mix. If an oscillator 
 12. Trapezoid
 13. Stepped saw
 
-Without FM, JUCE processes an oscillator block using its phase increment and waveform generator. With FM enabled, `OscData` processes samples individually: it renders the modulator, changes the carrier frequency for that sample, renders the carrier, and writes the result to each output channel.
+`OscData` owns a 50 ms linear carrier-frequency smoother. At a steady frequency without FM, JUCE processes the oscillator as a block. During a pitch ramp or with FM enabled, `OscData` processes samples individually: it advances the carrier smoother, adds any FM deviation, sets the instantaneous frequency without additional JUCE smoothing, renders the carrier, and writes the result to each output channel. Switching FM off retains an in-progress carrier ramp; note starts snap it to the assigned pitch. Existing portamento targets still advance per render block, so this does not make the glide trajectory sample-accurate.
 
 The current sine path uses a range-reduced polynomial for Sine, Rectified Sine, and the FM modulator. It avoids a library `sin` call for the normal `-π` to `π` phase range. The measured maximum pointwise error is approximately `1.2e-7`; the normal patch FM tests were below approximately `-113 dB` relative error.
 
@@ -163,6 +163,8 @@ All four envelopes restart from zero for a newly assigned note. Filter envelopes
 Filter coefficient caching avoids recalculating unchanged cutoff and resonance values. The filter curve uses the same Q mapping and an exact digital response calculation so its visual line agrees with the DSP filter.
 
 `AdsrData` is a small wrapper around JUCE's ADSR. Separate amplitude and filter envelopes are maintained for each oscillator.
+
+The processor owns a 10 ms master-gain smoother. Each voice uses 10 ms ramps for oscillator gain, base cutoff and resonance. Base cutoff is smoothed before adding the filter envelope; envelope amount and ADSR timing are unchanged. The voice advances gain, cutoff and resonance ramps while an oscillator is muted. Preparation resets ramp lengths for the current sample rate, and new notes snap voice-owned ramps to their latest targets. Stereo channels share one ramp value per sample. Filter type/slope changes and the existing low-pass bypass boundary retain their previous switching behavior.
 
 ## Visualizers and thread boundaries
 
@@ -215,6 +217,8 @@ Parameters are created in `BlueSynthAudioProcessor::createParameters` and stored
 - Filter-envelope ADSR values for each oscillator.
 - `UNISONVOICES`, `UNISONDETUNE`, and oscillator 2 equivalents.
 - Global `PORTAMENTO`, `GLIDEALWAYS`, `PITCH`, and `MASTERGAIN`. A state without `GLIDEALWAYS` restores it off.
+
+`PORTAMENTO` preserves the original 0–2 second range, 0.01-second interval and 0.3 skew for host normalization. The editor overrides only its slider's range mapping to linear travel; the attachment still sends and receives seconds. Host/preset state stores plain seconds, including values above one. The interim 0–1-second linear parameter mapping had no version marker, so normalized automation from that build cannot be identified or migrated automatically.
 
 `getStateInformation` serializes the APVTS value tree to XML embedded in the host's plugin state. `setStateInformation` restores that tree when the host reloads a project.
 

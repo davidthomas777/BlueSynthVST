@@ -131,6 +131,9 @@ private:
     float filterRes2    { 0.1f };
     int   filterType2   { 0 };
 
+    juce::SmoothedValue<float> cutoffSmooth { 20000.0f }, cutoffSmooth2 { 20000.0f };
+    juce::SmoothedValue<float> resonanceSmooth { 0.1f }, resonanceSmooth2 { 0.1f };
+
     // --- Filter coefficient recompute cache (avoid redundant per-sample recalculation) ---
     float lastAppliedCutoff  { -1.0f };
     float lastAppliedRes     { -1.0f };
