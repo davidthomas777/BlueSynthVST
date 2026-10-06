@@ -11,6 +11,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include "AppFont.h"
 #include "FilterCurveComponent.h"
 #include "FilterComponent.h"
 #include "ADSRComponent.h"
@@ -50,7 +51,7 @@ private:
     // rather than on the whole component, since a component-wide setLookAndFeel would
     // also cascade to filterA/filterB/envA/envB's rotary knobs and combo boxes and strip
     // their custom arc/square styling from the editor's top-level LookAndFeel.
-    struct SquareButtonLookAndFeel : public juce::LookAndFeel_V4
+    struct SquareButtonLookAndFeel : public AppLookAndFeel
     {
         void drawButtonBackground (juce::Graphics&, juce::Button&, const juce::Colour& backgroundColour,
                                    bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown) override;

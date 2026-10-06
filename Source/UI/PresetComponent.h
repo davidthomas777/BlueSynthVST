@@ -1,6 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include "AppFont.h"
 #include "../Data/PresetManager.h"
 
 class PresetComponent : public juce::Component,
@@ -19,7 +20,7 @@ public:
 private:
     // Overrides drawComboBoxTextWhenNothingSelected to use full opacity
     // (JUCE's default hardcodes 0.5f alpha for placeholder text)
-    struct PresetBoxLookAndFeel : public juce::LookAndFeel_V4
+    struct PresetBoxLookAndFeel : public AppLookAndFeel
     {
         void drawComboBoxTextWhenNothingSelected (juce::Graphics&, juce::ComboBox&, juce::Label&) override;
         void drawComboBox (juce::Graphics&, int width, int height, bool, int, int, int, int, juce::ComboBox&) override;

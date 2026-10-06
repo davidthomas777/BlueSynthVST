@@ -71,6 +71,8 @@ Older projects without name metadata cannot recover the original name automatica
 
 ### Visual feedback
 
+The interface uses bundled JetBrains Mono weights 400–800 from Google Fonts, with SF Mono as a system fallback. Font files and their [SIL Open Font License](Resources/Fonts/OFL.txt) are included for offline use.
+
 - Two pitch-synchronized scopes, following a selected note rather than displaying a whole chord's sum.
 - Amber borders indicate an oscillator sum reaching full scale; red indicates output reaching full scale. These are meters, not limiters.
 - A filter curve showing type, slope, resonance and envelope-modulated cutoff, including cutoff updates while idle.

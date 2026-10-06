@@ -119,7 +119,8 @@ void FilterComponent::setSliderWithLabel (juce::Slider& slider, juce::Label& lab
                                            std::unique_ptr<SliderAttachment>& attachment)
 {
     slider.setSliderStyle (juce::Slider::SliderStyle::RotaryVerticalDrag);
-    slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 50, 18);
+    // Wide enough for CUTOFF's longest readout ("999Hz") without JUCE falling back to "...".
+    slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 46, 19);
     slider.setColour (juce::Slider::thumbColourId,               juce::Colours::white);
     slider.setColour (juce::Slider::rotarySliderFillColourId,    juce::Colours::white);
     slider.setColour (juce::Slider::rotarySliderOutlineColourId, juce::Colours::black);

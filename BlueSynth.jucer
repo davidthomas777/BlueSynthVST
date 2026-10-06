@@ -58,6 +58,14 @@
       <FILE id="BsRegTests" name="RegressionTests.cpp" compile="0" resource="0" file="Tests/RegressionTests.cpp"/>
       <FILE id="BsTestRun" name="run.sh" compile="0" resource="0" file="Tests/run.sh"/>
     </GROUP>
+    <GROUP id="BsFonts" name="Fonts">
+      <FILE id="BsFont400" name="JetBrainsMono400.ttf" compile="0" resource="1" file="Resources/Fonts/JetBrainsMono400.ttf"/>
+      <FILE id="BsFont500" name="JetBrainsMono500.ttf" compile="0" resource="1" file="Resources/Fonts/JetBrainsMono500.ttf"/>
+      <FILE id="BsFont600" name="JetBrainsMono600.ttf" compile="0" resource="1" file="Resources/Fonts/JetBrainsMono600.ttf"/>
+      <FILE id="BsFont700" name="JetBrainsMono700.ttf" compile="0" resource="1" file="Resources/Fonts/JetBrainsMono700.ttf"/>
+      <FILE id="BsFont800" name="JetBrainsMono800.ttf" compile="0" resource="1" file="Resources/Fonts/JetBrainsMono800.ttf"/>
+      <FILE id="BsFontOFL" name="OFL.txt" compile="0" resource="1" file="Resources/Fonts/OFL.txt"/>
+    </GROUP>
   </MAINGROUP>
   <MODULES>
     <MODULE id="juce_animation" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>

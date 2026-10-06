@@ -82,7 +82,7 @@ void ADSRComponent::resized()
 void ADSRComponent::setSliderParams (juce::Slider& slider, juce::Label& label, const juce::String& labelText)
 {
     slider.setSliderStyle (juce::Slider::SliderStyle::LinearVertical);
-    slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 40, 25);
+    slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 38, 19);
 
     slider.textFromValueFunction = [](double value) { return juce::String (value, 2); };
     slider.valueFromTextFunction = [](const juce::String& text) { return text.getDoubleValue(); };

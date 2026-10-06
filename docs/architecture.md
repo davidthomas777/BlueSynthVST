@@ -198,6 +198,8 @@ The processor owns a `SynthVoice::SharedState` that outlives its voices. It hold
 - The 44-key `PianoComponent` covering C2–G5.
 - Preset navigation, save, and delete controls.
 
+`AppFont.h` caches embedded JetBrains Mono typefaces (weights 400–800) for UI text, with SF Mono as a system fallback. Projucer owns the font resources in `Resources/Fonts` and generates `BinaryData`; fonts are loaded in UI work, never during audio rendering.
+
 The editor starts a 60 Hz timer. That timer drains visualizer audio, updates scope frequency, updates the filter curve, reads clip flags, and repaints only the areas that need to change. It stops the timer and releases its look-and-feel pointer in the editor destructor.
 
 The piano is backed by the processor's `MidiKeyboardState`. It does not have a separate synthesis path.

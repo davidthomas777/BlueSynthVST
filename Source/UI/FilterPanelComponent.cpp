@@ -1,3 +1,4 @@
+#include "AppFont.h"
 /*
   ==============================================================================
 
@@ -18,6 +19,7 @@ FilterPanelComponent::FilterPanelComponent (FilterComponent& filter1, ADSRCompon
     filter2Tab.setClickingTogglesState (false);
     filter1Tab.onClick = [this] { selectFilter (0); };
     filter2Tab.onClick = [this] { selectFilter (1); };
+    squareButtonLookAndFeel.setDefaultSansSerifTypeface (appTypeface (500));
     filter1Tab.setLookAndFeel (&squareButtonLookAndFeel);
     filter2Tab.setLookAndFeel (&squareButtonLookAndFeel);
     addAndMakeVisible (filter1Tab);

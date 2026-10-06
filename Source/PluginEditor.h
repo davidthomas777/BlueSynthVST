@@ -9,6 +9,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include "UI/AppFont.h"
 #include "PluginProcessor.h"
 #include "UI/ADSRComponent.h"
 #include "UI/OscComponent.h"
@@ -32,21 +33,32 @@ public:
 private:
     void timerCallback() override;
 
-    struct DownwardComboLookAndFeel : public juce::LookAndFeel_V4
+    struct DownwardComboLookAndFeel : public AppLookAndFeel
     {
         juce::PopupMenu::Options getOptionsForComboBoxPopupMenu (juce::ComboBox&, juce::Label&) override;
         void drawComboBox (juce::Graphics&, int width, int height, bool, int, int, int, int, juce::ComboBox&) override;
         void drawRotarySlider (juce::Graphics&, int x, int y, int width, int height,
                                float sliderPos, float rotaryStartAngle, float rotaryEndAngle,
                                juce::Slider&) override;
+        // How far the drawn arc is inset from the slider's own bounds. Lets two sliders with
+        // different total heights (and therefore different label/value-box margins) still
+        // render the exact same knob diameter, by pairing a smaller slider height with a
+        // smaller inset — see topKnobLookAndFeel below.
+        float rotaryInset = 10.0f;
         // Square, outlined, same look as the FILTER 1/2 tabs. Only the ALWAYS switch is a
         // TextButton at this level; child components' buttons carry their own LookAndFeel.
         void drawButtonBackground (juce::Graphics&, juce::Button&, const juce::Colour& backgroundColour,
                                    bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown) override;
+        void drawTickBox (juce::Graphics&, juce::Component&, float, float, float, float, bool, bool, bool, bool) override;
+        void drawButtonText (juce::Graphics&, juce::TextButton&, bool, bool) override;
         juce::Font getTextButtonFont (juce::TextButton&, int buttonHeight) override;
     };
 
     DownwardComboLookAndFeel editorLookAndFeel;
+    // Used only by the OSC1/OSC2 Pitch/Oct/Gain and master Gain/Glide/Pitch knobs, whose
+    // sliders are shorter than FilterComponent/OscComponent's (tighter label/value-box
+    // margins) but still need to draw the same diameter — see rotaryInset above.
+    DownwardComboLookAndFeel topKnobLookAndFeel;
 
     BlueSynthAudioProcessor& audioProcessor;
 
@@ -118,7 +130,7 @@ private:
     juce::Label  gainLabel;
     juce::Slider portamentoSlider;
     juce::Label  portamentoLabel;
-    juce::TextButton glideAlwaysButton { "ALWAYS" };   // latching; lit white when on, like a selected tab
+    juce::TextButton glideAlwaysButton { "A" };   // latching; lit white when on, like a selected tab
     juce::Slider pitchSlider;
     juce::Label  pitchLabel;
 

@@ -63,7 +63,7 @@ using Attachment = juce::AudioProcessorValueTreeState::SliderAttachment;
 void OscComponent::setSliderWithLabel (juce::Slider& slider, juce::Label& label, juce::AudioProcessorValueTreeState& apvts, juce::String paramId, std::unique_ptr<Attachment>& attachment)
 {
     slider.setSliderStyle (juce::Slider::SliderStyle::RotaryVerticalDrag);
-    slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 50, 18);
+    slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 38, 19);
     slider.setColour (juce::Slider::thumbColourId,              juce::Colours::white);
     slider.setColour (juce::Slider::rotarySliderFillColourId,   juce::Colours::white);
     slider.setColour (juce::Slider::rotarySliderOutlineColourId, juce::Colours::black);

@@ -1,3 +1,4 @@
+#include "AppFont.h"
 #include "PresetComponent.h"
 
 // Sharp-cornered ComboBox (overrides LookAndFeel_V4's fillRoundedRectangle)
@@ -114,6 +115,7 @@ PresetComponent::PresetComponent (juce::AudioProcessorValueTreeState& a, PresetM
     styleBtn (deleteButton);
 
     // Apply custom LookAndFeel to entire component so it cascades to all children
+    presetLookAndFeel.setDefaultSansSerifTypeface (appTypeface (500));
     setLookAndFeel (&presetLookAndFeel);
     presetBox.addListener (this);
     presetBox.setTextWhenNothingSelected ("-- No Preset --");
