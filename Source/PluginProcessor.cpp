@@ -339,7 +339,10 @@ juce::AudioProcessorValueTreeState::ParameterLayout BlueSynthAudioProcessor::cre
     // ---- Osc 1 ----
     params.push_back (std::make_unique<juce::AudioParameterBool>   ("OSC1ENABLED",  "Osc 1 Enabled", true));
     params.push_back (std::make_unique<juce::AudioParameterFloat>  ("OSC1GAIN", "Gain", juce::NormalisableRange<float> {0.0f, 1.0f, 0.01f}, 0.5f));
-    params.push_back (std::make_unique<juce::AudioParameterInt>    ("OSC1OCTAVE", "Octave", -4, 4, 0));
+    params.push_back (std::make_unique<juce::AudioParameterInt>    ("OSC1OCTAVE", "Octave", -4, 4, 0,
+        juce::String(),
+        [](int v, int) -> juce::String { return v > 0 ? "+" + juce::String (v) : juce::String (v); },
+        [](const juce::String& t) -> int { return t.removeCharacters ("+").getIntValue(); }));
     {
         juce::NormalisableRange<float> r (-24.0f, 24.0f,
             [](float s,float e,float v){return s+v*(e-s);}, [](float s,float e,float v){return (v-s)/(e-s);},
@@ -376,7 +379,11 @@ juce::AudioProcessorValueTreeState::ParameterLayout BlueSynthAudioProcessor::cre
     params.push_back (std::make_unique<juce::AudioParameterFloat> ("FILTERENVRELEASE", "Filter Env Release", juce::NormalisableRange<float> {0.0f, 3.0f, 0.01f}, 0.4f));
     params.push_back (std::make_unique<juce::AudioParameterInt>   ("UNISONVOICES", "Unison Voices", 1, 8, 1));
     params.push_back (std::make_unique<juce::AudioParameterFloat> ("UNISONDETUNE", "Unison Detune", juce::NormalisableRange<float> {0.0f, 1.0f, 0.01f}, 0.0f));
-    params.push_back (std::make_unique<juce::AudioParameterFloat> ("PORTAMENTO", "Portamento", juce::NormalisableRange<float> {0.0f, 2.0f, 0.01f, 0.3f}, 0.0f));
+    // Linear, not skewed: the 0.01 interval fixes the reachable values at {0, 0.01, ... 1.00}
+    // whatever the skew is, so a skew adds no resolution — it only redistributes those steps
+    // along the knob. The old 0.3 skew put 0.01 a fifth of the way around the arc, so the
+    // first step off zero jumped visibly.
+    params.push_back (std::make_unique<juce::AudioParameterFloat> ("PORTAMENTO", "Portamento", juce::NormalisableRange<float> {0.0f, 1.0f, 0.01f}, 0.0f));
     {
         juce::NormalisableRange<float> r (-24.0f, 24.0f,
             [](float s,float e,float v){return s+v*(e-s);}, [](float s,float e,float v){return (v-s)/(e-s);},
@@ -389,7 +396,10 @@ juce::AudioProcessorValueTreeState::ParameterLayout BlueSynthAudioProcessor::cre
     // ---- Osc 2 ----
     params.push_back (std::make_unique<juce::AudioParameterBool>   ("OSC2ENABLED",  "Osc 2 Enabled", false));
     params.push_back (std::make_unique<juce::AudioParameterFloat>  ("OSC2GAIN", "Gain", juce::NormalisableRange<float> {0.0f, 1.0f, 0.01f}, 0.5f));
-    params.push_back (std::make_unique<juce::AudioParameterInt>    ("OSC2OCTAVE", "Octave", -4, 4, 0));
+    params.push_back (std::make_unique<juce::AudioParameterInt>    ("OSC2OCTAVE", "Octave", -4, 4, 0,
+        juce::String(),
+        [](int v, int) -> juce::String { return v > 0 ? "+" + juce::String (v) : juce::String (v); },
+        [](const juce::String& t) -> int { return t.removeCharacters ("+").getIntValue(); }));
     {
         juce::NormalisableRange<float> r (-24.0f, 24.0f,
             [](float s,float e,float v){return s+v*(e-s);}, [](float s,float e,float v){return (v-s)/(e-s);},

@@ -30,10 +30,11 @@ static constexpr int kToggleY   = 60;   // enable-button + gain/octave knob row
 static constexpr int kKnobDropY = 10;
 static constexpr int kKnobLabelH = 12;
 static constexpr int kKnobLabelGap = 0;
-// Width matches the other circular knobs (FilterComponent's cutoff/res/env and
-// OscComponent's FM/VOICES/DETUNE), which both fill kOscKnobH down to 63px — see the
-// comment on FilterComponent::resized()'s knobSize for why that number is hardcoded there too.
-static constexpr int kKnobSize = 63;
+// Box width. Only wide enough for the value box plus a margin: the drawn knob is sized from
+// whichever of the two dimensions is smaller, and after kKnobSliderH loses its text box the
+// height is always the smaller one, so narrowing this trims dead space to either side of the
+// knob without changing the knob itself.
+static constexpr int kKnobSize = 46;
 // Slider height is shorter than kKnobSize, paired with topKnobLookAndFeel's smaller
 // rotaryInset (see PluginEditor.h) so the label/value-box margins are tighter while the
 // drawn knob diameter still matches the other circular knobs exactly.
@@ -427,6 +428,12 @@ BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProc
     addAndMakeVisible (adsr2);
     addAndMakeVisible (osc2);
 
+    // The Pitch knob's bounds overlap these toggles' by a few px (see kKnobRowX). Only the
+    // knob's empty margin falls in that strip, so keeping the toggles in front costs the knob
+    // nothing and leaves the whole "OSC 1" label clickable.
+    osc1EnableButton.toFront (false);
+    osc2EnableButton.toFront (false);
+
     // Sliders build their value box inside setTextBoxStyle(), which the child components call
     // from their own constructors — before they are parented here, so that box is created with
     // JUCE's default LookAndFeel and misses AppLookAndFeel::createSliderTextBox's font. Now
@@ -587,9 +594,11 @@ void BlueSynthAudioProcessorEditor::resized()
     // GLIDE's label normally shares the knob's own centred width, but the "A" toggle sits
     // beside it, so the label+button pair is centred as a group over the knob below instead.
     const int glideKnobCenterX = box2X + kBoxW / 2;
-    const int glideLabelW      = 40;
+    // Label width is kept close to "GLIDE"'s rendered width: it is centred, so any extra
+    // width shows up as slack between the text and the ALWAYS button next to it.
+    const int glideLabelW      = 36;
     const int glideButtonW     = 16;
-    const int glideGroupGap    = 2;
+    const int glideGroupGap    = 1;
     const int glideGroupX      = glideKnobCenterX - (glideLabelW + glideGroupGap + glideButtonW) / 2;
     portamentoLabel.setBounds (glideGroupX, kBoxY + kKnobDropY, glideLabelW, kKnobLabelH);
     glideAlwaysButton.setBounds (glideGroupX + glideLabelW + glideGroupGap, kBoxY + kKnobDropY - 2, glideButtonW, kBoxSwitchRowH);
@@ -600,19 +609,23 @@ void BlueSynthAudioProcessorEditor::resized()
     const int kVolKnobSize = 38;  // rotary size; all nine controls share the stacked layout
     const int kToggleW    = 78;  // just wide enough for "OSC 1" + checkbox
     const int kKnobGap    = 5;   // gap between the pitch/octave/gain knob pairs
-    const int kPairW      = 63;  // preserve horizontal spacing of the oscillator controls
+
+    // Pulled left of centre, close to the OSC enable toggle. kKnobSize leaves ~11px of empty
+    // box either side of the drawn knob, so these bounds can overlap the toggle's without the
+    // knob covering its text — the toggles are brought to the front for that reason.
+    const int kKnobRowX = 67;
 
     auto layoutOscillatorKnobs = [&layoutKnob] (int columnX,
                                                juce::Label& pitch, juce::Slider& pitchKnob,
                                                juce::Label& octave, juce::Slider& octaveKnob,
                                                juce::Label& gain, juce::Slider& gainKnob)
     {
-        const int gainX = columnX + kColW - kPairW - 28;
-        const int octaveX = gainX - kKnobGap - kPairW;
-        const int pitchX = octaveX - kKnobGap - kPairW;
-        layoutKnob (pitchX, kPairW, pitch, pitchKnob);
-        layoutKnob (octaveX, kPairW, octave, octaveKnob);
-        layoutKnob (gainX, kPairW, gain, gainKnob);
+        const int pitchX = columnX + kKnobRowX;
+        const int octaveX = pitchX + kKnobSize + kKnobGap;
+        const int gainX = octaveX + kKnobSize + kKnobGap;
+        layoutKnob (pitchX, kKnobSize, pitch, pitchKnob);
+        layoutKnob (octaveX, kKnobSize, octave, octaveKnob);
+        layoutKnob (gainX, kKnobSize, gain, gainKnob);
     };
 
     // ---- Osc 1 column ----

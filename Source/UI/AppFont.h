@@ -44,7 +44,7 @@ public:
     juce::Label* createSliderTextBox (juce::Slider& slider) override
     {
         auto* label = juce::LookAndFeel_V4::createSliderTextBox (slider);
-        label->setFont (appFont (slider.getTextBoxHeight() <= 16 ? 10.0f : 11.0f, 400));
+        label->setFont (appFont (slider.getTextBoxHeight() <= 16 ? 10.0f : 12.5f, 400));
         label->setBorderSize (juce::BorderSize<int> (1));
         return label;
     }
