@@ -21,7 +21,7 @@ static constexpr int kCol2X = kCol1X + kColW + kGap;  // = 560
 // plus a fixed gap, so inserting/reordering panels only requires touching one line.
 static constexpr int kGapY      = 8;    // vertical gap between stacked panels
 static constexpr int kPresetY   = 32;
-static constexpr int kToggleY   = 60;   // enable-button + gain/octave knob row
+static constexpr int kToggleY   = kPresetY + 24 + kGapY;   // top control panel
 
 // Pitch/Oct/Gain (and the master Gain/Glide/Pitch) knobs are dropped below the enable-button
 // row by this much so their label's visible top lines up with the OSC1/OSC2 toggle's visible
@@ -40,7 +40,8 @@ static constexpr int kKnobSize = 46;
 // drawn knob diameter still matches the other circular knobs exactly.
 static constexpr int kKnobSliderH = 57;
 
-static constexpr int kWaveY     = kToggleY + kKnobDropY + kKnobLabelH + kKnobLabelGap + kKnobSliderH + kGapY;
+static constexpr int kTopPanelBottom = kToggleY + kKnobDropY + kKnobLabelH + kKnobLabelGap + kKnobSliderH + kGapY;
+static constexpr int kWaveY     = kTopPanelBottom + kGapY;
 static constexpr int kWaveH     = 24;
 static constexpr int kVisY      = kWaveY + kWaveH + kGapY;    // oscilloscope, between wave selector and envelope
 static constexpr int kVisH      = 80;
@@ -552,6 +553,11 @@ void BlueSynthAudioProcessorEditor::paint (juce::Graphics& g)
     g.setFont (appFont (20.0f));
     g.drawText ("BLUESYNTH", 0, 4, getWidth(), 24, juce::Justification::centred);
 
+    const int topPanelHeight = kTopPanelBottom - kToggleY;
+    g.drawRect (kCol1X, kToggleY, kColW, topPanelHeight, 1);
+    g.drawRect (kCol2X, kToggleY, kColW, topPanelHeight, 1);
+    g.drawRect (kBox3X, kToggleY, kBox1X + kBoxW - kBox3X, topPanelHeight, 1);
+
     // Oscilloscope panel outlines — visible even when idle/silent, amber when that
     // oscillator has run out of headroom, red when the output itself is clipping.
     // Kept at 1px: the visualisers sit inset by exactly that much, so a thicker stroke
@@ -597,7 +603,7 @@ void BlueSynthAudioProcessorEditor::resized()
     const int glideKnobCenterX = box2X + kBoxW / 2;
     // Label width is kept close to "GLIDE"'s rendered width: it is centred, so any extra
     // width shows up as slack between the text and the ALWAYS button next to it.
-    const int glideLabelW      = 36;
+    const int glideLabelW      = 30;
     const int glideButtonW     = 16;
     const int glideGroupGap    = 1;
     const int glideGroupX      = glideKnobCenterX - (glideLabelW + glideGroupGap + glideButtonW) / 2;
@@ -614,7 +620,7 @@ void BlueSynthAudioProcessorEditor::resized()
     // Pulled left of centre, close to the OSC enable toggle. kKnobSize leaves ~11px of empty
     // box either side of the drawn knob, so these bounds can overlap the toggle's without the
     // knob covering its text — the toggles are brought to the front for that reason.
-    const int kKnobRowX = 67;
+    const int kKnobRowX = 67 + kGapY;
 
     auto layoutOscillatorKnobs = [&layoutKnob] (int columnX,
                                                juce::Label& pitch, juce::Slider& pitchKnob,
@@ -630,8 +636,8 @@ void BlueSynthAudioProcessorEditor::resized()
     };
 
     // ---- Osc 1 column ----
-    // Toggle shifted 4px left so its checkbox visually aligns with the combo box outline
-    osc1EnableButton .setBounds (kCol1X - 4, kToggleY, kToggleW, kVolKnobSize);
+    // The tick box has a 4px internal inset; keep its visible edge 8px inside the panel.
+    osc1EnableButton .setBounds (kCol1X + kGapY - 4, kToggleY, kToggleW, kVolKnobSize);
 
     layoutOscillatorKnobs (kCol1X, osc1PitchLabel, osc1PitchKnob,
                            osc1OctaveLabel, osc1OctaveKnob, osc1VolumeLabel, osc1VolumeKnob);
@@ -644,7 +650,7 @@ void BlueSynthAudioProcessorEditor::resized()
     osc              .setBounds (kCol1X, kOscKnobY, kColW, kOscKnobH);
 
     // ---- Osc 2 column ----
-    osc2EnableButton .setBounds (kCol2X - 4, kToggleY, kToggleW, kVolKnobSize);
+    osc2EnableButton .setBounds (kCol2X + kGapY - 4, kToggleY, kToggleW, kVolKnobSize);
 
     layoutOscillatorKnobs (kCol2X, osc2PitchLabel, osc2PitchKnob,
                            osc2OctaveLabel, osc2OctaveKnob, osc2VolumeLabel, osc2VolumeKnob);
