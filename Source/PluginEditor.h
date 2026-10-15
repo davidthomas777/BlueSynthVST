@@ -9,6 +9,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include "UI/ModSlider.h"
 #include "UI/AppFont.h"
 #include "PluginProcessor.h"
 #include "UI/ADSRComponent.h"
@@ -18,9 +19,11 @@
 #include "UI/OscilloscopeComponent.h"
 #include "UI/FilterPanelComponent.h"
 #include "UI/PianoComponent.h"
+#include "UI/LfoComponent.h"
 
 //==============================================================================
 class BlueSynthAudioProcessorEditor  : public juce::AudioProcessorEditor,
+                                        public juce::DragAndDropContainer,
                                         private juce::Timer
 {
 public:
@@ -49,6 +52,7 @@ private:
         // TextButton at this level; child components' buttons carry their own LookAndFeel.
         void drawButtonBackground (juce::Graphics&, juce::Button&, const juce::Colour& backgroundColour,
                                    bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown) override;
+        void drawToggleButton (juce::Graphics&, juce::ToggleButton&, bool, bool) override;
         void drawTickBox (juce::Graphics&, juce::Component&, float, float, float, float, bool, bool, bool, bool) override;
         void drawButtonText (juce::Graphics&, juce::TextButton&, bool, bool) override;
         juce::Font getTextButtonFont (juce::TextButton&, int buttonHeight) override;
@@ -66,17 +70,18 @@ private:
     // order here is load-bearing — audioProcessor must stay declared first (members init in
     // declaration order regardless of the constructor's initializer-list order).
     PianoComponent pianoComponent { audioProcessor.keyboardState };
+    LfoComponent lfoComponent { audioProcessor.modulation };
 
     // ---- Preset ----
     PresetComponent presetComponent;
 
     // ---- Osc 1 ----
     juce::ToggleButton osc1EnableButton;
-    juce::Slider       osc1VolumeKnob;
+    ModSlider       osc1VolumeKnob;
     juce::Label        osc1VolumeLabel { "Volume", "Volume" };
-    juce::Slider       osc1PitchKnob;
+    ModSlider       osc1PitchKnob;
     juce::Label        osc1PitchLabel { "Pitch", "Pitch" };
-    juce::Slider       osc1OctaveKnob;
+    ModSlider       osc1OctaveKnob;
     juce::Label        osc1OctaveLabel { "Oct", "Oct" };
     juce::ComboBox     oscWaveSelector;
     ADSRComponent      adsr;
@@ -87,11 +92,11 @@ private:
 
     // ---- Osc 2 ----
     juce::ToggleButton osc2EnableButton;
-    juce::Slider       osc2VolumeKnob;
+    ModSlider       osc2VolumeKnob;
     juce::Label        osc2VolumeLabel { "Volume", "Volume" };
-    juce::Slider       osc2PitchKnob;
+    ModSlider       osc2PitchKnob;
     juce::Label        osc2PitchLabel { "Pitch", "Pitch" };
-    juce::Slider       osc2OctaveKnob;
+    ModSlider       osc2OctaveKnob;
     juce::Label        osc2OctaveLabel { "Oct", "Oct" };
     juce::ComboBox     osc2WaveSelector;
     ADSRComponent      adsr2;
@@ -126,12 +131,14 @@ private:
     int outputClipHold { 0 };
 
     // ---- Master knobs ----
-    juce::Slider gainSlider;
+    juce::TextButton undoButton { "UNDO" };
+    juce::TextButton redoButton { "REDO" };
+    ModSlider gainSlider;
     juce::Label  gainLabel;
-    juce::Slider portamentoSlider;
+    ModSlider portamentoSlider;
     juce::Label  portamentoLabel;
     juce::TextButton glideAlwaysButton { "A" };   // latching; lit white when on, like a selected tab
-    juce::Slider pitchSlider;
+    ModSlider pitchSlider;
     juce::Label  pitchLabel;
 
     using SliderAttachment   = juce::AudioProcessorValueTreeState::SliderAttachment;

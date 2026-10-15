@@ -17,6 +17,7 @@
 #include "Data/OscData.h"
 #include "Data/FilterData.h"
 #include "Data/VisualizerBuffer.h"
+#include "Data/Modulation.h"
 
 class SynthVoice : public juce::SynthesiserVoice {
 public:
@@ -54,22 +55,26 @@ public:
 
     struct SharedState
     {
+        Modulation::Engine* modulation = nullptr;
         std::atomic<float> lastPlayedHz { 0.0f };
         std::atomic<SynthVoice*> displayVoice { nullptr };
         std::atomic<float> lastOsc1Hz { 0.0f }, lastOsc2Hz { 0.0f };
         std::atomic<float> lastFilter1Cutoff { 20000.0f }, lastFilter2Cutoff { 20000.0f };
+        std::atomic<float> lastFilter1Res { 0.1f }, lastFilter2Res { 0.1f };
 
         // Keys physically down right now, maintained by BlueSynthesiser on the audio thread.
         // A note-on that arrives while another key is held is legato, which is the only case
         // glide applies to unless GLIDEALWAYS is on.
         std::bitset<128> heldKeys;
 
-        void publishIdleCutoffs (float cutoff1, float cutoff2)
+        void publishIdleFilterValues (float cutoff1, float cutoff2, float res1, float res2)
         {
             if (displayVoice.load (std::memory_order_relaxed) == nullptr)
             {
                 lastFilter1Cutoff.store (cutoff1, std::memory_order_relaxed);
                 lastFilter2Cutoff.store (cutoff2, std::memory_order_relaxed);
+                lastFilter1Res.store (res1, std::memory_order_relaxed);
+                lastFilter2Res.store (res2, std::memory_order_relaxed);
             }
         }
     };
@@ -89,6 +94,15 @@ public:
     void updateOscPitch2  (float semitones);
 
 private:
+    std::array<double,2> lfoPhase {};
+    std::array<float,2> lfoValues {};
+    bool renderingModulation = false;
+    bool modulationWasActive = false;
+    float modulated (int target, float base) const noexcept;
+    void renderCore (juce::AudioBuffer<float>&, int, int);
+    std::array<std::array<juce::SmoothedValue<float>,8>,2> unisonWeights;
+    std::array<std::array<juce::SmoothedValue<float>,8>,2> unisonLeft, unisonRight;
+    void renderModulatedBank (std::array<OscData,8>&, int bank, int voices, juce::AudioBuffer<float>&);
     static constexpr int maxUnisonVoices = 8;
 
     // --- Osc 1 ---
@@ -156,11 +170,13 @@ private:
     double storedSampleRate    { 44100.0 };
 
     // Glide runs linearly in semitones so an octave takes the same time and sounds the same
-    // at any register, arriving exactly when portamentoTime is up. Fixed at note start.
+    // at any register. A routed LFO updates the remaining duration while the glide runs.
     float glideStartSemi   { 0.0f };
     float glideEndSemi     { 0.0f };
     int   glideTotalSamples { 0 };
     int   glideDoneSamples  { 0 };
+    float glideProgress { 0.0f };
+    bool  glideUsesModulation { false };
 
     void updateOscFrequencies();
 
@@ -208,5 +224,10 @@ public:
     }
 
 private:
+    void renderVoices (juce::AudioBuffer<float>& buffer, int startSample, int numSamples) override
+    {
+        juce::Synthesiser::renderVoices (buffer, startSample, numSamples);
+        if (sharedState.modulation != nullptr) sharedState.modulation->eventOffset = startSample + numSamples;
+    }
     SynthVoice::SharedState& sharedState;
 };

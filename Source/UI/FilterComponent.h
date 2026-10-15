@@ -11,6 +11,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include "ModSlider.h"
 
 //==============================================================================
 class FilterComponent  : public juce::Component
@@ -36,9 +37,9 @@ private:
     juce::ComboBox filterTypeSelector;
     juce::ComboBox slopeSelector;
     int slopeLabelType { -1 };
-    juce::Slider   cutoffSlider;
-    juce::Slider   resonanceSlider;
-    juce::Slider   envAmtSlider;
+    ModSlider   cutoffSlider;
+    ModSlider   resonanceSlider;
+    ModSlider   envAmtSlider;
 
     juce::Label cutoffLabel    { "Cutoff",  "CUTOFF" };
     juce::Label resonanceLabel { "Res",     "RES" };

@@ -118,6 +118,7 @@ void FilterComponent::setSliderWithLabel (juce::Slider& slider, juce::Label& lab
                                            juce::String paramId,
                                            std::unique_ptr<SliderAttachment>& attachment)
 {
+    slider.setComponentID (paramId);
     slider.setSliderStyle (juce::Slider::SliderStyle::RotaryVerticalDrag);
     // Wide enough for CUTOFF's longest readout ("999Hz") without JUCE falling back to "...".
     slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 46, 19);

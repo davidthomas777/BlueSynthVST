@@ -12,6 +12,7 @@
 #include "Data/PresetManager.h"
 #include "Data/VisualizerBuffer.h"
 #include "SynthVoice.h"
+#include "Data/Modulation.h"
 
 //==============================================================================
 /**
@@ -56,8 +57,12 @@ public:
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
     
+    // Must outlive APVTS, which records parameter and modulation-state edits here.
+    juce::UndoManager undoManager;
+
     // Creates a state object for a given processor, and sets up the parameters that control that processor
     juce::AudioProcessorValueTreeState apvts;
+    Modulation::Engine modulation { apvts };
     PresetManager presetManager;
 
     // Backs the on-screen piano in the editor. Clicking a key calls noteOn()/noteOff() here;
@@ -88,8 +93,11 @@ public:
     // currently adding), for the filter curve visualizer's live dot.
     float getFilter1LiveCutoffHz() const;
     float getFilter2LiveCutoffHz() const;
+    float getFilter1LiveResonance() const;
+    float getFilter2LiveResonance() const;
 
 private:
+    double renderSampleRate = 44100;
     juce::SmoothedValue<float> masterGain;
     // Outlives the voices: member destruction runs in reverse declaration order.
     SynthVoice::SharedState voiceState;

@@ -11,6 +11,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include "ModSlider.h"
 //==============================================================================
 /*
 */
@@ -31,10 +32,10 @@ private:
 
     juce::String titleText;
 
-    juce::Slider attackSlider;
-    juce::Slider decaySlider;
-    juce::Slider sustainSlider;
-    juce::Slider releaseSlider;
+    ModSlider attackSlider;
+    ModSlider decaySlider;
+    ModSlider sustainSlider;
+    ModSlider releaseSlider;
 
     juce::Label attackLabel;
     juce::Label decayLabel;

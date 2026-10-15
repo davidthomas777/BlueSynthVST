@@ -193,3 +193,13 @@ void OscData::setFmParams (const float depth, const float freq)
     fmOscFreq = freq;
     fmDepth   = depth;
 }
+
+float OscData::nextModulatedSample (float semitones, float depth, float frequency)
+{
+    fmOsc.setFrequency (frequency, true);
+    const float fm = depth != 0 && frequency != 0 ? fmOsc.processSample(0.0f)*depth : 0;
+    float hz = carrierFrequency.getNextValue()*std::pow(2.0f,semitones/12.0f)+fm;
+    if(hz<0) hz+=sampleRateHz*std::ceil(-hz/sampleRateHz);
+    setFrequency(hz,true);
+    return processSample(0.0f);
+}

@@ -24,6 +24,9 @@ public:
     // Call on note start:
     // a reused voice otherwise glides from its previous pitch into the new one.
     void snapFrequency();
+    float nextModulatedSample (float semitones, float depth, float frequency);
+    float getFmDepth() const noexcept { return fmDepth; }
+    float getFmFrequency() const noexcept { return fmOscFreq; }
 
 private:
     static float sineForPhase (float x) noexcept

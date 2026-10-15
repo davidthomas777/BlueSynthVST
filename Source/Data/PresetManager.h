@@ -1,6 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+namespace Modulation { class Engine; }
 
 class PresetManager
 {
@@ -8,6 +9,7 @@ public:
     static const juce::String presetFileExtension;
 
     PresetManager();
+    Modulation::Engine* modulation = nullptr;
 
     bool savePreset   (juce::AudioProcessorValueTreeState& apvts, const juce::String& name);
     bool loadPreset   (juce::AudioProcessorValueTreeState& apvts, const juce::String& name);

@@ -27,4 +27,13 @@ Coverage:
 - Carrier pitch ramps with and without FM, switching FM off mid-ramp, and note-start pitch snapping at four sample rates.
 - Rendered audio consistency across buffer sizes during rapid gain, cutoff, resonance and pitch automation, including interrupted ramps and oscillator muting, with and without FM.
 
-These are offline regression checks, not a substitute for listening, FL Studio project round-trips, CPU benchmarking, or a full memory/thread sanitizer run. Preset dialog lifetime guards were reviewed separately; the suite does not automate native modal dialogs.
+- LFO sample-rate/division timing, PPQ seek alignment, stopped-clock continuation and 120 BPM fallback; rendered gain, pitch, cutoff, unison and master modulation across block sizes 1/17/128/512 with MIDI events inside blocks.
+- All 39 destinations with both sources, exact zero-depth/bypass neutrality, logarithmic cutoff summation/clamping and unchanged base parameters.
+- LFO host-state round-trip, legacy loading over a modulated state, malformed curves and concurrent curve-table publication/render reads.
+- All 39 UI controls accepting both drag sources, including the hidden filter tab; optional editor snapshot with `BLUESYNTH_LFO_SNAPSHOT=1` (writes `/tmp/bluesynth-lfo-ui.png`).
+- Live attack, decay, release and sustain modulation for both amplifier and filter envelopes, plus rendered resonance values for both filter graphs and LFO-driven glide progress.
+- Live-marker publication and clearing in the rendered note/release/idle lifecycle, flicker-free validity between audio blocks, simultaneous cutoff and envelope-amount modulation, idle depth edits, and image-level verification that clearing the marker preserves the assignment range.
+- Parameter and LFO-curve undo/redo, including audio-side curve-table publication, plus presence and top-row placement of both history buttons.
+- Printed offline timing comparison: 32 notes, both eight-carrier banks, 100 blocks of 128 at 48 kHz, unassigned versus two active routes. This is a wall-clock comparison without a pass/fail CPU threshold, not a DAW meter or a comprehensive benchmark.
+
+These are offline regression checks, not a substitute for listening, FL Studio project round-trips, preset-file save/load in a host, native drag gesture testing, or a full memory/thread sanitizer run. Preset dialog lifetime guards were reviewed separately; the suite does not automate native modal dialogs.
