@@ -38,6 +38,18 @@ static inline float hzToSemitones (float hz)   { return 69.0f + 12.0f * std::log
 static inline float semitonesToHz (float semi) { return 440.0f * std::pow (2.0f, (semi - 69.0f) / 12.0f); }
 
 void SynthVoice::startNote (int midiNoteNumber, float velocity, juce::SynthesiserSound *sound, int currentPitchWheelPosition) {
+    lfoPhase.fill (0);
+    if (auto* m = sharedState.modulation)
+    {
+        lfoValues = m->valuesAt (lfoPhase, m->eventOffset);
+        adsr.setModulation(m,&lfoValues,Modulation::attack1);
+        adsr2.setModulation(m,&lfoValues,Modulation::attack2);
+        filterAdsr.setModulation(m,&lfoValues,Modulation::envAttack1);
+        filterAdsr2.setModulation(m,&lfoValues,Modulation::envAttack2);
+    }
+    const float glideTime = modulated (Modulation::glide, portamentoTime);
+    glideUsesModulation = sharedState.modulation != nullptr && sharedState.modulation->active (Modulation::glide);
+    glideProgress = 0.0f;
     targetHz = (float) juce::MidiMessage::getMidiNoteInHertz (midiNoteNumber);
     const float prev = sharedState.lastPlayedHz.load();
 
@@ -45,11 +57,11 @@ void SynthVoice::startNote (int midiNoteNumber, float velocity, juce::Synthesise
     // key was still down: a legato note. Serum-style, that is the only time glide applies
     // unless the ALWAYS switch is on.
     const bool legato = sharedState.heldKeys.count() > 1;
-    if (portamentoTime > 0.001f && prev > 0.0f && (glideAlways || legato))
+    if (glideTime > 0.001f && prev > 0.0f && (glideAlways || legato))
     {
         glideStartSemi    = hzToSemitones (prev);
         glideEndSemi      = (float) midiNoteNumber;
-        glideTotalSamples = juce::jmax (1, (int) std::lround (portamentoTime * storedSampleRate));
+        glideTotalSamples = juce::jmax (1, (int) std::lround (glideTime * storedSampleRate));
         glideDoneSamples  = 0;
         currentHz         = prev;
     }
@@ -61,7 +73,10 @@ void SynthVoice::startNote (int midiNoteNumber, float velocity, juce::Synthesise
     sharedState.lastPlayedHz.store (targetHz);
     noteHeld = true;
     sharedState.displayVoice.store (this, std::memory_order_relaxed);   // newest note claims the scope
+    modulationWasActive = sharedState.modulation != nullptr && sharedState.modulation->voiceActive;
+    renderingModulation = modulationWasActive;
     updateOscFrequencies();
+    renderingModulation = false;
     // Nor may it inherit the previous note's pitch: without this every reused voice slides
     // into its new frequency over the oscillator's 50ms smoother, even with portamento off.
     for (auto& o : unisonOscs)  o.snapFrequency();
@@ -77,9 +92,20 @@ void SynthVoice::startNote (int midiNoteNumber, float velocity, juce::Synthesise
     adsr2.reset();  filterAdsr2.reset();
     adsr.noteOn();  filterAdsr.noteOn();
     adsr2.noteOn(); filterAdsr2.noteOn();
+    for (int bank=0;bank<2;++bank)
+        for (int i=0;i<8;++i)
+        {
+            const int count=bank==0?numUnisonVoices:numUnisonVoices2;
+            const float weight=i<count?1.0f:0.0f;
+            const float angle=count>1?juce::MathConstants<float>::halfPi*i/(count-1):0;
+            unisonWeights[bank][i].setCurrentAndTargetValue(weight/std::sqrt((float)count));
+            unisonLeft[bank][i].setCurrentAndTargetValue(weight*(count>1?std::cos(angle)/std::sqrt((float)count):1));
+            unisonRight[bank][i].setCurrentAndTargetValue(weight*(count>1?std::sin(angle)/std::sqrt((float)count):1));
+        }
 }
 
 void SynthVoice::stopNote (float velocity, bool allowTailOff) {
+    if (auto* m=sharedState.modulation) lfoValues=m->valuesAt(lfoPhase,m->eventOffset);
     noteHeld = false;
     adsr.noteOff();  filterAdsr.noteOff();
     adsr2.noteOff(); filterAdsr2.noteOff();
@@ -115,6 +141,9 @@ void SynthVoice::prepareToPlay (double sampleRate, int samplesPerBlock, int outp
     spec.maximumBlockSize = samplesPerBlock;
     spec.numChannels      = outputChannels;
     storedSampleRate = sampleRate;
+    for (auto& bank : unisonWeights) for (auto& weight : bank) weight.reset(sampleRate,0.005);
+    for (auto& bank : unisonLeft) for (auto& weight : bank) weight.reset(sampleRate,0.005);
+    for (auto& bank : unisonRight) for (auto& weight : bank) weight.reset(sampleRate,0.005);
 
     for (auto& o : unisonOscs)  o.prepareToPlay (spec);
     for (auto& o : unisonOscs2) o.prepareToPlay (spec);
@@ -231,7 +260,7 @@ void SynthVoice::updateOscFrequencies()
         sharedState.lastOsc2Hz.store (pitchedHz2, std::memory_order_relaxed);
     }
 
-    for (int i = 0; i < numUnisonVoices; ++i)
+    for (int i = 0; i < (renderingModulation ? 8 : numUnisonVoices); ++i)
     {
         float offset = 0.0f;
         if (numUnisonVoices > 1)
@@ -240,7 +269,7 @@ void SynthVoice::updateOscFrequencies()
         unisonOscs[i].setWaveFrequencyHz (pitchedHz1, offset);
     }
 
-    for (int i = 0; i < numUnisonVoices2; ++i)
+    for (int i = 0; i < (renderingModulation ? 8 : numUnisonVoices2); ++i)
     {
         float offset = 0.0f;
         if (numUnisonVoices2 > 1)
@@ -301,6 +330,76 @@ static void renderUnisonBank (std::array<OscData, 8>& oscs, int numVoices,
 
 void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer, int startSample, int numSamples)
 {
+    if (!isVoiceActive()) return;
+    auto* m=sharedState.modulation;
+    if (m==nullptr || !m->voiceActive)
+    {
+        modulationWasActive=false;
+        renderCore(outputBuffer,startSample,numSamples);
+        if(m!=nullptr) m->advance(lfoPhase,numSamples);
+        return;
+    }
+    renderingModulation=true;
+    updateOscFrequencies();
+    if (!modulationWasActive)
+    {
+        for (int i=numUnisonVoices;i<8;++i) unisonOscs[i].snapFrequency();
+        for (int i=numUnisonVoices2;i<8;++i) unisonOscs2[i].snapFrequency();
+    }
+    modulationWasActive=true;
+    for(int i=0;i<numSamples && isVoiceActive();++i)
+    {
+        lfoValues=m->valuesAt(lfoPhase,startSample+i);
+        renderCore(outputBuffer,startSample+i,1);
+        m->advance(lfoPhase,1);
+    }
+    renderingModulation=false;
+}
+
+float SynthVoice::modulated (int target,float base) const noexcept
+{
+    auto* m=sharedState.modulation;
+    const float value=m!=nullptr?m->apply(target,base,lfoValues):base;
+    if(m!=nullptr && isDisplayVoice()) m->publishDisplay(target,value);
+    return value;
+}
+
+void SynthVoice::renderModulatedBank (std::array<OscData,8>& oscs, int bank, int baseCount, juce::AudioBuffer<float>& output)
+{
+    using namespace Modulation;
+    const int offset=bank==0?0:18;
+    const int voices=(int)modulated(voices1+offset,(float)baseCount);
+    const float detune=modulated(detune1+offset,bank==0?unisonDetune:unisonDetune2);
+    const float baseDetune=bank==0?unisonDetune:unisonDetune2;
+    const float basePitch=bank==0?oscPitch1:oscPitch2;
+    const float baseOct=(float)(bank==0?octave1:octave2);
+    const float pitchDelta=modulated(pitch,pitchOffsetSemitones)-pitchOffsetSemitones
+                         +modulated(pitch1+offset,basePitch)-basePitch
+                         +12*(modulated(Modulation::octave1+offset,baseOct)-baseOct);
+    const float fmFrequency=modulated(fmFreq1+offset,oscs[0].getFmFrequency());
+    const float fmDepth=modulated(fmDepth1+offset,oscs[0].getFmDepth());
+    float left=0,right=0;
+    for(int i=0;i<8;++i)
+    {
+        auto& weight=unisonWeights[bank][i]; weight.setTargetValue(i<voices?1/std::sqrt((float)voices):0);
+        float w=weight.getNextValue();
+        const float spread=voices>1?juce::jlimit(-1.0f,1.0f,2.0f*i/(voices-1)-1):0;
+        const float baseSpread=baseCount>1?2.0f*i/(baseCount-1)-1:0;
+        const float angle=(spread+1)*juce::MathConstants<float>::pi*.25f;
+        const float l=voices==1?1:std::cos(angle), r=voices==1?1:std::sin(angle);
+        const float scale=i<voices?1/std::sqrt((float)voices):0;
+        unisonLeft[bank][i].setTargetValue(l*scale); unisonRight[bank][i].setTargetValue(r*scale);
+        const float lGain=unisonLeft[bank][i].getNextValue(), rGain=unisonRight[bank][i].getNextValue();
+        if(w==0 && lGain==0 && rGain==0) continue;
+        const float sample=oscs[i].nextModulatedSample(pitchDelta+(spread*detune-baseSpread*baseDetune)*.5f,fmDepth,fmFrequency);
+        left+=sample*(output.getNumChannels()>1?lGain:w); right+=sample*rGain;
+    }
+    output.setSample(0,0,left);
+    if(output.getNumChannels()>1) output.setSample(1,0,right);
+}
+
+void SynthVoice::renderCore (juce::AudioBuffer<float>& outputBuffer, int startSample, int numSamples)
+{
     jassert (isPrepared);
 
     if (!isVoiceActive())
@@ -325,7 +424,21 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer, int st
     // ---- Portamento ----
     // Pitch is stepped once per block, at the value the glide has reached by the block's
     // first sample; the final block lands exactly on the target.
-    if (glideDoneSamples < glideTotalSamples)
+    const float previousHz = currentHz;
+    const float liveGlideTime = sharedState.modulation != nullptr && sharedState.modulation->active (Modulation::glide)
+                                    ? modulated (Modulation::glide, portamentoTime) : portamentoTime;
+    if (glideUsesModulation && glideTotalSamples > 0)
+    {
+        if (glideProgress < 1.0f)
+        {
+            currentHz = semitonesToHz (glideStartSemi + (glideEndSemi - glideStartSemi) * glideProgress);
+            glideProgress = liveGlideTime > 0.001f
+                                ? juce::jmin (1.0f, glideProgress + (float) (numSamples / (liveGlideTime * storedSampleRate)))
+                                : 1.0f;
+        }
+        else currentHz = targetHz;
+    }
+    else if (glideDoneSamples < glideTotalSamples)
     {
         const float t = (float) glideDoneSamples / (float) glideTotalSamples;
         currentHz = semitonesToHz (glideStartSemi + (glideEndSemi - glideStartSemi) * t);
@@ -335,7 +448,7 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer, int st
     {
         currentHz = targetHz;
     }
-    updateOscFrequencies();
+    if (!renderingModulation || previousHz != currentHz) updateOscFrequencies();
 
     // ================================================================
     // OSC 1 chain: unison → gain → filter+filterEnv → ampADSR
@@ -345,24 +458,28 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer, int st
 
     if (osc1Enabled)
     {
-        renderUnisonBank (unisonOscs, numUnisonVoices, synthBuffer, unisonTempBuffer);
+        if(renderingModulation) renderModulatedBank(unisonOscs,0,numUnisonVoices,synthBuffer);
+        else renderUnisonBank (unisonOscs, numUnisonVoices, synthBuffer, unisonTempBuffer);
 
         {
             auto audioBlock = juce::dsp::AudioBlock<float> (synthBuffer);
-            gain.process (juce::dsp::ProcessContextReplacing<float> (audioBlock));
+            if(renderingModulation) synthBuffer.applyGain(modulated(Modulation::gain1,gain.processSample(1.0f)*2)*.5f);
+            else gain.process (juce::dsp::ProcessContextReplacing<float> (audioBlock));
         }
 
         // Tracks the last sample's cutoff so it can be published once after the loop, for
         // the filter curve visualizer's live dot — not per sample, since the envelope moves
         // far slower than audio and the UI only polls at 60Hz.
         float finalCutoff = filterCutoff;
+        float finalResonance = filterRes;
 
         for (int s = 0; s < synthBuffer.getNumSamples(); ++s)
         {
             float env    = filterAdsr.getNextSample();
-            float cutoff = juce::jlimit (20.0f, kFilterCutoffMax, cutoffSmooth.getNextValue() + env * filterEnvAmt * kFilterCutoffMax);
-            const float resonance = resonanceSmooth.getNextValue();
+            float cutoff = juce::jlimit (20.0f, kFilterCutoffMax, modulated(Modulation::cutoff1,cutoffSmooth.getNextValue()) + env * modulated(Modulation::envAmount1,filterEnvAmt) * kFilterCutoffMax);
+            const float resonance = modulated(Modulation::resonance1,resonanceSmooth.getNextValue());
             finalCutoff  = cutoff;
+            finalResonance = resonance;
 
             // The envelope still has to advance every sample even when nothing is filtered,
             // or the filter env would freeze while the cutoff sits at the ceiling.
@@ -382,7 +499,10 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer, int st
         }
 
         if (isDisplayVoice())
+        {
             sharedState.lastFilter1Cutoff.store (finalCutoff, std::memory_order_relaxed);
+            sharedState.lastFilter1Res.store (finalResonance, std::memory_order_relaxed);
+        }
 
         adsr.applyEnvelopeToBuffer (synthBuffer, 0, synthBuffer.getNumSamples());
 
@@ -404,9 +524,12 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer, int st
             gain.processSample (0.0f);
         }
         if (numSamples > 0 && isDisplayVoice())
+        {
             sharedState.lastFilter1Cutoff.store (
                 juce::jlimit (20.0f, kFilterCutoffMax, cutoffSmooth.getCurrentValue() + env * filterEnvAmt * kFilterCutoffMax),
                 std::memory_order_relaxed);
+            sharedState.lastFilter1Res.store (resonanceSmooth.getCurrentValue(), std::memory_order_relaxed);
+        }
     }
 
     // ================================================================
@@ -417,21 +540,25 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer, int st
         osc2Buffer.setSize (outputBuffer.getNumChannels(), numSamples, false, false, true);
         osc2Buffer.clear();
 
-        renderUnisonBank (unisonOscs2, numUnisonVoices2, osc2Buffer, unisonTempBuffer);
+        if(renderingModulation) renderModulatedBank(unisonOscs2,1,numUnisonVoices2,osc2Buffer);
+        else renderUnisonBank (unisonOscs2, numUnisonVoices2, osc2Buffer, unisonTempBuffer);
 
         {
             auto osc2Block = juce::dsp::AudioBlock<float> (osc2Buffer);
-            gain2.process (juce::dsp::ProcessContextReplacing<float> (osc2Block));
+            if(renderingModulation) osc2Buffer.applyGain(modulated(Modulation::gain2,gain2.processSample(1.0f)*2)*.5f);
+            else gain2.process (juce::dsp::ProcessContextReplacing<float> (osc2Block));
         }
 
         float finalCutoff2 = filterCutoff2;
+        float finalResonance2 = filterRes2;
 
         for (int s = 0; s < osc2Buffer.getNumSamples(); ++s)
         {
             float env    = filterAdsr2.getNextSample();
-            float cutoff = juce::jlimit (20.0f, kFilterCutoffMax, cutoffSmooth2.getNextValue() + env * filterEnvAmt2 * kFilterCutoffMax);
-            const float resonance = resonanceSmooth2.getNextValue();
+            float cutoff = juce::jlimit (20.0f, kFilterCutoffMax, modulated(Modulation::cutoff2,cutoffSmooth2.getNextValue()) + env * modulated(Modulation::envAmount2,filterEnvAmt2) * kFilterCutoffMax);
+            const float resonance = modulated(Modulation::resonance2,resonanceSmooth2.getNextValue());
             finalCutoff2 = cutoff;
+            finalResonance2 = resonance;
 
             if (filterIsBypassed (filterType2, cutoff))
                 continue;
@@ -449,7 +576,10 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer, int st
         }
 
         if (isDisplayVoice())
+        {
             sharedState.lastFilter2Cutoff.store (finalCutoff2, std::memory_order_relaxed);
+            sharedState.lastFilter2Res.store (finalResonance2, std::memory_order_relaxed);
+        }
 
         adsr2.applyEnvelopeToBuffer (osc2Buffer, 0, osc2Buffer.getNumSamples());
 
@@ -475,9 +605,12 @@ void SynthVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer, int st
             gain2.processSample (0.0f);
         }
         if (numSamples > 0 && isDisplayVoice())
+        {
             sharedState.lastFilter2Cutoff.store (
                 juce::jlimit (20.0f, kFilterCutoffMax, cutoffSmooth2.getCurrentValue() + env * filterEnvAmt2 * kFilterCutoffMax),
                 std::memory_order_relaxed);
+            sharedState.lastFilter2Res.store (resonanceSmooth2.getCurrentValue(), std::memory_order_relaxed);
+        }
     }
 
     // ================================================================

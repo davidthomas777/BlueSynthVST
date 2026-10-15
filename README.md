@@ -60,6 +60,21 @@ Velocity-sensitive gain, pitch-wheel modulation, custom MIDI CC mappings and MPE
 
 Master/oscillator gain and base filter cutoff/resonance changes use 10 ms ramps. Carrier pitch changes use 50 ms smoothing with or without FM; new notes start at their assigned pitch. Filter-envelope timing and its linear-Hz amount mapping are unchanged. Waveform, filter-type/slope, oscillator-enable and FM-depth switches are not crossfaded by this smoothing pass.
 
+### LFO modulation
+
+Two independent LFO tabs sit below the keyboard, with editable curves and Sine, Triangle, Ramp up, Ramp down and Square presets. Double-click to add a point (up to 32), drag a point to move it, drag a segment to bend it, and right-click an interior point to delete it.
+
+Drag **DRAG LFO 1/2** onto any of the 23 rotary knobs or 16 envelope faders. A new assignment starts at zero depth and opens its depth control. Right-click a destination to assign or edit either source; each assignment supports signed depth, bipolar/unipolar operation, bypass and removal. Knob values remain the saved base settings. Thin range indicators and live markers show modulation separately.
+
+- Rate: 0.05–20 Hz, or tempo sync from four bars to 1/64 with straight, dotted and triplet divisions (bar labels assume four quarter-note beats).
+- Retrigger: a separate cycle starts with each note and continues through release. With retrigger off, voices share a free-running cycle; synced free mode follows host PPQ while playing. Missing tempo uses 120 BPM, and stopped transport continues on the sample clock.
+- Master gain uses one processor-wide cycle; retrigger resets it on every note-on.
+- Both sources add before destination clamping. Cutoff uses a logarithmic frequency range, pitch uses semitones, and octave/unison count remain discrete. Unison contributions crossfade over 5 ms.
+- Assigned LFOs update attack, decay and release time during each active stage; sustain moves live too. An assigned Glide LFO updates duration throughout an active glide. Glide still requires a previous pitch and either legato playing or ALWAYS, and a zero duration moves immediately to the new note. The filter envelope still adds a linear Hz offset after LFO cutoff modulation.
+- Curves, timing and routes are saved in presets and host state. Older states clear LFO assignments and restore the default sine/1 Hz/retrigger settings.
+
+LFO rendering adds CPU work, especially with high polyphony, unison and moving filter coefficients. The regression runner prints an offline comparison; it does not measure a DAW's CPU meter or guarantee a host buffer deadline.
+
 ### Presets and project recall
 
 Save, load, delete and step through XML presets in:
@@ -70,6 +85,8 @@ Save, load, delete and step through XML presets in:
 
 Projects save the sound settings **and the last known preset name**. Editing the sound retains that name. Restoration uses the project's saved settings without reloading the preset file, so the name can remain visible if the file has been moved or deleted.
 
+The top-right **UNDO** and **REDO** buttons step through parameter, routing and LFO-curve edits. Loading a preset or restoring host state starts a fresh history.
+
 Older projects without name metadata cannot recover the original name automatically. BlueSynth cannot infer a name from an external host preset that supplies no name metadata. The displayed name identifies the sound's origin; it does not guarantee a match with the preset file.
 
 ### Visual feedback
@@ -78,7 +95,7 @@ The interface uses bundled JetBrains Mono weights 400–800 from Google Fonts, w
 
 - Two pitch-synchronized scopes, following a selected note rather than displaying a whole chord's sum.
 - Amber borders indicate an oscillator sum reaching full scale; red indicates output reaching full scale. These are meters, not limiters.
-- A filter curve showing type, slope, resonance and envelope-modulated cutoff, including cutoff updates while idle.
+- A filter curve showing type, slope, live resonance and envelope-modulated cutoff, including base-value updates while idle.
 - Scope display shaping that affects only the picture.
 
 ## CPU and latency
@@ -130,7 +147,7 @@ After adding, removing or renaming source files, update the .jucer project and r
 bash Tests/run.sh
 ```
 
-The runner builds Shared Code and executes **17 regression groups** for FM output, instance isolation, preset state, filters, MIDI releases, filter envelopes, voice-reuse pitch, glide compatibility and parameter smoothing. It does not install plugins or modify preset files. Processor construction may create the preset directory if absent.
+The runner builds Shared Code and executes **27 regression groups** for FM output, instance isolation, preset state, filters, MIDI releases, envelopes, voice-reuse pitch, glide compatibility, smoothing, undo/redo and LFO routing/timing/state/UI. It also prints an offline dense-polyphony timing comparison. It does not install plugins or modify preset files. Processor construction may create the preset directory if absent.
 
 See [test coverage and limitations](Tests/README.md). Offline passes do not establish FL Studio project compatibility, perceived sound quality or a CPU ceiling.
 
@@ -171,7 +188,7 @@ See [test coverage and limitations](Tests/README.md). Offline passes do not esta
 Planned, not implemented:
 
 - Shared waveform lookup tables and pitch-aware band-limiting.
-- LFO modulation and a broader modulation system.
+- Additional modulation sources and destinations.
 - Reverb, delay, chorus and other effects.
 - Factory presets and AI-assisted preset generation.
 

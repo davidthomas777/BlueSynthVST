@@ -16,6 +16,8 @@
       <FILE id="nlPacC" name="PluginEditor.h" compile="0" resource="0" file="Source/PluginEditor.h"/>
     </GROUP>
     <GROUP id="{9EEF88F3-716B-C9FF-0564-DA8D472E671D}" name="Data">
+      <FILE id="BsModH" name="Modulation.h" compile="0" resource="0" file="Source/Data/Modulation.h"/>
+      <FILE id="BsModC" name="Modulation.cpp" compile="1" resource="0" file="Source/Data/Modulation.cpp"/>
       <FILE id="Q5XoTT" name="AdsrData.cpp" compile="1" resource="0" file="Source/Data/AdsrData.cpp"/>
       <FILE id="SiNi3x" name="AdsrData.h" compile="0" resource="0" file="Source/Data/AdsrData.h"/>
       <FILE id="AXJpFB" name="OscData.cpp" compile="1" resource="0" file="Source/Data/OscData.cpp"/>
@@ -29,6 +31,10 @@
       <FILE id="VsBf2h" name="VisualizerBuffer.h" compile="0" resource="0" file="Source/Data/VisualizerBuffer.h"/>
     </GROUP>
     <GROUP id="{62270905-B2F4-6EEB-C633-ED3DC0854DFD}" name="UI">
+      <FILE id="BsModSliderH" name="ModSlider.h" compile="0" resource="0" file="Source/UI/ModSlider.h"/>
+      <FILE id="BsModSliderC" name="ModSlider.cpp" compile="1" resource="0" file="Source/UI/ModSlider.cpp"/>
+      <FILE id="BsLfoH" name="LfoComponent.h" compile="0" resource="0" file="Source/UI/LfoComponent.h"/>
+      <FILE id="BsLfoC" name="LfoComponent.cpp" compile="1" resource="0" file="Source/UI/LfoComponent.cpp"/>
       <FILE id="KES7NP" name="ADSRComponent.cpp" compile="1" resource="0"
             file="Source/UI/ADSRComponent.cpp"/>
       <FILE id="WjmGFu" name="ADSRComponent.h" compile="0" resource="0" file="Source/UI/ADSRComponent.h"/>
@@ -55,6 +61,7 @@
       <FILE id="PnCp2h" name="PianoComponent.h" compile="0" resource="0" file="Source/UI/PianoComponent.h"/>
     </GROUP>
     <GROUP id="BsTests" name="Tests">
+      <FILE id="BsLfoTests" name="LfoTests.h" compile="0" resource="0" file="Tests/LfoTests.h"/>
       <FILE id="BsRegTests" name="RegressionTests.cpp" compile="0" resource="0" file="Tests/RegressionTests.cpp"/>
       <FILE id="BsTestRun" name="run.sh" compile="0" resource="0" file="Tests/run.sh"/>
     </GROUP>

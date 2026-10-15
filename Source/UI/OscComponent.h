@@ -11,6 +11,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include "ModSlider.h"
 
 //==============================================================================
 /*
@@ -27,10 +28,10 @@ public:
     void resized() override;
 
 private:
-    juce::Slider fmFreqSlider;
-    juce::Slider fmDepthSlider;
-    juce::Slider unisonVoicesSlider;
-    juce::Slider unisonDetuneSlider;
+    ModSlider fmFreqSlider;
+    ModSlider fmDepthSlider;
+    ModSlider unisonVoicesSlider;
+    ModSlider unisonDetuneSlider;
 
     using Attachment = juce::AudioProcessorValueTreeState::SliderAttachment;
 

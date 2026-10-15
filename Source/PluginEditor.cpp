@@ -30,6 +30,8 @@ static constexpr int kToggleY   = kPresetY + 24 + kGapY;   // top control panel
 static constexpr int kKnobDropY = 10;
 static constexpr int kKnobLabelH = 12;
 static constexpr int kKnobLabelGap = 0;
+static constexpr int kTopLabelLift = 4;
+static constexpr int kTopKnobRowNudgeY = 3;
 // Box width. Only wide enough for the value box plus a margin: the drawn knob is sized from
 // whichever of the two dimensions is smaller, and after kKnobSliderH loses its text box the
 // height is always the smaller one, so narrowing this trims dead space to either side of the
@@ -38,7 +40,7 @@ static constexpr int kKnobSize = 46;
 // Slider height is shorter than kKnobSize, paired with topKnobLookAndFeel's smaller
 // rotaryInset (see PluginEditor.h) so the label/value-box margins are tighter while the
 // drawn knob diameter still matches the other circular knobs exactly.
-static constexpr int kKnobSliderH = 57;
+static constexpr int kKnobSliderH = 63;
 
 static constexpr int kTopPanelBottom = kToggleY + kKnobDropY + kKnobLabelH + kKnobLabelGap + kKnobSliderH + kGapY;
 static constexpr int kWaveY     = kTopPanelBottom + kGapY;
@@ -203,6 +205,26 @@ void BlueSynthAudioProcessorEditor::DownwardComboLookAndFeel::drawTickBox (
     }
 }
 
+void BlueSynthAudioProcessorEditor::DownwardComboLookAndFeel::drawToggleButton (
+    juce::Graphics &g, juce::ToggleButton &button, bool highlighted, bool down)
+{
+    const float size = juce::jmin (15.0f, button.getHeight () * 0.75f);
+    const float tick = size * 1.1f;
+    // The top margin is (38 - 16.5) / 2 = 10.75px within a component lifted 4px
+    // above its panel. A 7px horizontal inset therefore gives the visible box the
+    // same ~7px margin from the panel's top and left outlines.
+    drawTickBox (g, button, 7.0f, (button.getHeight () - tick) * 0.5f, tick, tick,
+                 button.getToggleState (), button.isEnabled (), highlighted, down);
+    g.setColour (button.findColour (juce::ToggleButton::textColourId));
+    g.setFont (appFont (size, 600));
+    if (!button.isEnabled ())
+        g.setOpacity (0.5f);
+    // Keep the OSC text fixed while moving only its selector box.
+    g.drawFittedText (button.getButtonText (),
+                      button.getLocalBounds ().withTrimmedLeft (juce::roundToInt (tick) + 10).withTrimmedRight (2),
+                      juce::Justification::centredLeft, 1);
+}
+
 void BlueSynthAudioProcessorEditor::DownwardComboLookAndFeel::drawButtonText (
     juce::Graphics& g, juce::TextButton& button, bool, bool)
 {
@@ -237,6 +259,7 @@ BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProc
     setSize (kWindowWidth, kWindowHeight);
 
     addAndMakeVisible (pianoComponent);
+    addAndMakeVisible (lfoComponent);
 
     // OscilloscopeComponent sizes its own window from the played pitch and is repainted by
     // the timer below, so there is nothing to configure here.
@@ -248,7 +271,7 @@ BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProc
     // topKnobLookAndFeel pairs a smaller rotaryInset with these sliders' shorter height
     // (kKnobSliderH) so the drawn knob still ends up the same diameter as FilterComponent/
     // OscComponent's — see the comment on rotaryInset in PluginEditor.h.
-    topKnobLookAndFeel.rotaryInset = 7.0f;
+    topKnobLookAndFeel.rotaryInset = 10.0f;
 
     auto styleKnob = [this](juce::Slider& s) {
         s.setSliderStyle (juce::Slider::RotaryVerticalDrag);
@@ -267,9 +290,25 @@ BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProc
         l.setJustificationType (juce::Justification::centred);
     };
 
+    auto styleHistoryButton = [this] (juce::TextButton &button)
+    {
+        button.setColour (juce::TextButton::buttonColourId, juce::Colour (0xff4A90E2));
+        button.setColour (juce::TextButton::textColourOffId, juce::Colours::white);
+        addAndMakeVisible (button);
+    };
+    styleHistoryButton (undoButton);
+    styleHistoryButton (redoButton);
+    undoButton.setComponentID ("UNDO");
+    redoButton.setComponentID ("REDO");
+    undoButton.setTooltip ("Undo the last parameter or LFO curve edit");
+    redoButton.setTooltip ("Redo the last undone edit");
+    undoButton.onClick = [this] { audioProcessor.undoManager.undo (); };
+    redoButton.onClick = [this] { audioProcessor.undoManager.redo (); };
+
     // ---- Master knobs ----
     styleKnob (gainSlider);
     gainAttachment = std::make_unique<SliderAttachment> (audioProcessor.apvts, "MASTERGAIN", gainSlider);
+    gainSlider.setComponentID("MASTERGAIN");
     gainSlider.setNumDecimalPlacesToDisplay (2);
     addAndMakeVisible (gainSlider);
     styleLabel (gainLabel, "GAIN");
@@ -277,6 +316,7 @@ BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProc
 
     styleKnob (portamentoSlider);
     portamentoAttachment = std::make_unique<SliderAttachment> (audioProcessor.apvts, "PORTAMENTO", portamentoSlider);
+    portamentoSlider.setComponentID("PORTAMENTO");
     portamentoSlider.setNormalisableRange (juce::NormalisableRange<double> { 0.0, 2.0, 0.01 });
     portamentoSlider.setNumDecimalPlacesToDisplay (2);
     addAndMakeVisible (portamentoSlider);
@@ -297,6 +337,7 @@ BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProc
 
     styleKnob (pitchSlider);
     pitchAttachment = std::make_unique<SliderAttachment> (audioProcessor.apvts, "PITCH", pitchSlider);
+    pitchSlider.setComponentID("PITCH");
     addAndMakeVisible (pitchSlider);
     styleLabel (pitchLabel, "PITCH");
     addAndMakeVisible (pitchLabel);
@@ -316,6 +357,7 @@ BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProc
     osc1VolumeKnob.setColour (juce::Slider::rotarySliderFillColourId,    juce::Colours::white);
     osc1VolumeKnob.setColour (juce::Slider::rotarySliderOutlineColourId, juce::Colours::black);
     osc1VolumeAttachment = std::make_unique<SliderAttachment> (audioProcessor.apvts, "OSC1GAIN", osc1VolumeKnob);
+    osc1VolumeKnob.setComponentID("OSC1GAIN");
     addAndMakeVisible (osc1VolumeKnob);
     styleLabel (osc1VolumeLabel, "GAIN");
     osc1VolumeLabel.setJustificationType (juce::Justification::centred);
@@ -330,6 +372,7 @@ BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProc
     osc1PitchKnob.setColour (juce::Slider::rotarySliderOutlineColourId, juce::Colours::black);
     osc1PitchKnob.setNumDecimalPlacesToDisplay (0);
     osc1PitchAttachment = std::make_unique<SliderAttachment> (audioProcessor.apvts, "OSC1PITCH", osc1PitchKnob);
+    osc1PitchKnob.setComponentID("OSC1PITCH");
     addAndMakeVisible (osc1PitchKnob);
     styleLabel (osc1PitchLabel, "PITCH");
     osc1PitchLabel.setJustificationType (juce::Justification::centred);
@@ -344,6 +387,7 @@ BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProc
     osc1OctaveKnob.setColour (juce::Slider::rotarySliderOutlineColourId, juce::Colours::black);
     osc1OctaveKnob.setNumDecimalPlacesToDisplay (0);
     osc1OctaveAttachment = std::make_unique<SliderAttachment> (audioProcessor.apvts, "OSC1OCTAVE", osc1OctaveKnob);
+    osc1OctaveKnob.setComponentID("OSC1OCTAVE");
     addAndMakeVisible (osc1OctaveKnob);
     styleLabel (osc1OctaveLabel, "OCT");
     osc1OctaveLabel.setJustificationType (juce::Justification::centred);
@@ -378,6 +422,7 @@ BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProc
     osc2VolumeKnob.setColour (juce::Slider::rotarySliderFillColourId,    juce::Colours::white);
     osc2VolumeKnob.setColour (juce::Slider::rotarySliderOutlineColourId, juce::Colours::black);
     osc2VolumeAttachment = std::make_unique<SliderAttachment> (audioProcessor.apvts, "OSC2GAIN", osc2VolumeKnob);
+    osc2VolumeKnob.setComponentID("OSC2GAIN");
     addAndMakeVisible (osc2VolumeKnob);
     styleLabel (osc2VolumeLabel, "GAIN");
     osc2VolumeLabel.setJustificationType (juce::Justification::centred);
@@ -392,6 +437,7 @@ BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProc
     osc2PitchKnob.setColour (juce::Slider::rotarySliderOutlineColourId, juce::Colours::black);
     osc2PitchKnob.setNumDecimalPlacesToDisplay (0);
     osc2PitchAttachment = std::make_unique<SliderAttachment> (audioProcessor.apvts, "OSC2PITCH", osc2PitchKnob);
+    osc2PitchKnob.setComponentID("OSC2PITCH");
     addAndMakeVisible (osc2PitchKnob);
     styleLabel (osc2PitchLabel, "PITCH");
     osc2PitchLabel.setJustificationType (juce::Justification::centred);
@@ -406,6 +452,7 @@ BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProc
     osc2OctaveKnob.setColour (juce::Slider::rotarySliderOutlineColourId, juce::Colours::black);
     osc2OctaveKnob.setNumDecimalPlacesToDisplay (0);
     osc2OctaveAttachment = std::make_unique<SliderAttachment> (audioProcessor.apvts, "OSC2OCTAVE", osc2OctaveKnob);
+    osc2OctaveKnob.setComponentID("OSC2OCTAVE");
     addAndMakeVisible (osc2OctaveKnob);
     styleLabel (osc2OctaveLabel, "OCT");
     osc2OctaveLabel.setJustificationType (juce::Justification::centred);
@@ -429,6 +476,7 @@ BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProc
     addAndMakeVisible (osc);
     addAndMakeVisible (adsr2);
     addAndMakeVisible (osc2);
+    ModSlider::bindTree (*this, audioProcessor.modulation);
 
     // The Pitch knob's bounds overlap these toggles' by a few px (see kKnobRowX). Only the
     // knob's empty margin falls in that strip, so keeping the toggles in front costs the knob
@@ -480,6 +528,10 @@ static const juce::Colour kHotOutline { 0xffffb020 };
 
 void BlueSynthAudioProcessorEditor::timerCallback()
 {
+    undoButton.setEnabled (audioProcessor.undoManager.canUndo ());
+    redoButton.setEnabled (audioProcessor.undoManager.canRedo ());
+    lfoComponent.refresh();
+    ModSlider::repaintTree (*this);
     presetComponent.refreshCurrentPresetName();
     audioProcessor.drainVisualizerAudio (osc1VisScratch, osc2VisScratch);
     applyVisualiserShaping (osc1VisScratch);
@@ -504,7 +556,8 @@ void BlueSynthAudioProcessorEditor::timerCallback()
                                         : audioProcessor.getFilter1LiveCutoffHz();
         filterPanel.updateCurve ((int) raw (second ? "FILTERTYPE2"   : "FILTERTYPE"),
                                        raw (second ? "FILTERCUTOFF2" : "FILTERCUTOFF"),
-                                       raw (second ? "FILTERRES2"    : "FILTERRES"),
+                                       second ? audioProcessor.getFilter2LiveResonance()
+                                              : audioProcessor.getFilter1LiveResonance(),
                                        liveCutoff, sr, (int) raw (second ? "FILTERSLOPE2" : "FILTERSLOPE"));
         filterComponent.updateSlopeLabels();
         filterComponent2.updateSlopeLabels();
@@ -585,15 +638,19 @@ void BlueSynthAudioProcessorEditor::resized()
     const int box1X = kBox1X;
     const int box2X = kBox2X;
     const int box3X = kBox3X;
+    const int historyW = (box1X + kBoxW - box3X + 1) / 2;
+    undoButton.setBounds (box3X, kPresetY, historyW, 24);
+    redoButton.setBounds (box3X + historyW - 1, kPresetY, historyW, 24);
 
     auto layoutKnob = [](int x, int width, juce::Label& label, juce::Slider& slider)
     {
         label.setJustificationType (juce::Justification::centred);
         label.setBorderSize (juce::BorderSize<int> (0));
         const int knobX = x + (width - kKnobSize) / 2;
-        const int labelY = kBoxY + kKnobDropY;
+        const int knobY = kBoxY + kKnobDropY + kKnobLabelH + kKnobLabelGap + kTopKnobRowNudgeY;
+        const int labelY = kBoxY + kKnobDropY - kTopLabelLift + kTopKnobRowNudgeY;
         label.setBounds (knobX, labelY, kKnobSize, kKnobLabelH);
-        slider.setBounds (knobX, labelY + kKnobLabelH + kKnobLabelGap, kKnobSize, kKnobSliderH);
+        slider.setBounds (knobX, knobY, kKnobSize, kKnobSliderH);
     };
     layoutKnob (box3X, kBoxW, gainLabel, gainSlider);
     layoutKnob (box2X, kBoxW, portamentoLabel, portamentoSlider);
@@ -607,8 +664,9 @@ void BlueSynthAudioProcessorEditor::resized()
     const int glideButtonW     = 16;
     const int glideGroupGap    = 1;
     const int glideGroupX      = glideKnobCenterX - (glideLabelW + glideGroupGap + glideButtonW) / 2;
-    portamentoLabel.setBounds (glideGroupX, kBoxY + kKnobDropY, glideLabelW, kKnobLabelH);
-    glideAlwaysButton.setBounds (glideGroupX + glideLabelW + glideGroupGap, kBoxY + kKnobDropY - 2, glideButtonW, kBoxSwitchRowH);
+    portamentoLabel.setBounds (glideGroupX, kBoxY + kKnobDropY - kTopLabelLift + kTopKnobRowNudgeY, glideLabelW, kKnobLabelH);
+    glideAlwaysButton.setBounds (glideGroupX + glideLabelW + glideGroupGap,
+                                 kBoxY + kKnobDropY - kTopLabelLift - 2 + kTopKnobRowNudgeY, glideButtonW, kBoxSwitchRowH);
 
     // Preset bar — spans both columns
     presetComponent.setBounds (kCol1X, kPresetY, kCol2X + kColW - kCol1X, 24);
@@ -636,8 +694,8 @@ void BlueSynthAudioProcessorEditor::resized()
     };
 
     // ---- Osc 1 column ----
-    // The tick box has a 4px internal inset; keep its visible edge 8px inside the panel.
-    osc1EnableButton .setBounds (kCol1X + kGapY - 4, kToggleY, kToggleW, kVolKnobSize);
+    // The tick box has a 4px internal inset; place that visible edge 4px inside the panel.
+    osc1EnableButton .setBounds (kCol1X, kToggleY - kTopLabelLift, kToggleW, kVolKnobSize);
 
     layoutOscillatorKnobs (kCol1X, osc1PitchLabel, osc1PitchKnob,
                            osc1OctaveLabel, osc1OctaveKnob, osc1VolumeLabel, osc1VolumeKnob);
@@ -650,7 +708,7 @@ void BlueSynthAudioProcessorEditor::resized()
     osc              .setBounds (kCol1X, kOscKnobY, kColW, kOscKnobH);
 
     // ---- Osc 2 column ----
-    osc2EnableButton .setBounds (kCol2X + kGapY - 4, kToggleY, kToggleW, kVolKnobSize);
+    osc2EnableButton .setBounds (kCol2X, kToggleY - kTopLabelLift, kToggleW, kVolKnobSize);
 
     layoutOscillatorKnobs (kCol2X, osc2PitchLabel, osc2PitchKnob,
                            osc2OctaveLabel, osc2OctaveKnob, osc2VolumeLabel, osc2VolumeKnob);
@@ -663,4 +721,5 @@ void BlueSynthAudioProcessorEditor::resized()
     // Piano — spans exactly the width of the two oscillator columns, directly below them.
     // PianoComponent draws its own border and insets its keyboard internally.
     pianoComponent.setBounds (kCol1X, kPianoY, kPianoWidth, kPianoH);
+    lfoComponent.setBounds (kCol1X, kPianoY + kPianoH + kGapY, kPianoWidth, 192);
 }

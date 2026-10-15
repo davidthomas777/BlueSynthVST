@@ -1,4 +1,5 @@
 #include "PresetManager.h"
+#include "Modulation.h"
 
 const juce::String PresetManager::presetFileExtension = ".xml";
 
@@ -23,7 +24,7 @@ void PresetManager::ensurePresetDirectoryExists() const
 
 bool PresetManager::savePreset (juce::AudioProcessorValueTreeState& apvts, const juce::String& name)
 {
-    auto state = apvts.copyState();
+    auto state = modulation != nullptr ? modulation->copyState() : apvts.copyState();
     state.setProperty ("presetName", name, nullptr);
     std::unique_ptr<juce::XmlElement> xml (state.createXml());
     if (xml == nullptr)
@@ -62,10 +63,12 @@ bool PresetManager::loadPreset (juce::AudioProcessorValueTreeState& apvts, const
             state.appendChild (parameter, nullptr);
         }
     }
+    Modulation::Engine::migrate (state);
     state.setProperty ("presetName", name, nullptr);
     // Parameter notifications can cause the host to request state during replacement.
     setCurrentPresetName (name, false);
-    apvts.replaceState (state);
+    if(modulation != nullptr) modulation->replaceState(state);
+    else apvts.replaceState (state);
     if (onPresetChanged)
         onPresetChanged();
     return true;

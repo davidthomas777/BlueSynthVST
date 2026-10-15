@@ -21,9 +21,12 @@ BlueSynthAudioProcessor::BlueSynthAudioProcessor()
                       #endif
                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
                      #endif
-                       ), apvts (*this, nullptr, "Parameters", createParameters())
+                       ), apvts (*this, &undoManager, "Parameters", createParameters())
 #endif
 {
+    voiceState.modulation = &modulation;
+    presetManager.modulation = &modulation;
+    modulation.onShapeChanged = [this] { updateHostDisplay (ChangeDetails{}.withNonParameterStateChanged (true)); };
     presetManager.onPresetChanged = [this]
     {
         updateHostDisplay (ChangeDetails{}.withNonParameterStateChanged (true)
@@ -36,6 +39,7 @@ BlueSynthAudioProcessor::BlueSynthAudioProcessor()
         voice->setVisualizerTargets (&osc1Vis, &osc2Vis, &osc1Display, &osc2Display);
         synth.addVoice (voice);
     }
+    undoManager.clearUndoHistory ();
 }
 
 BlueSynthAudioProcessor::~BlueSynthAudioProcessor() {}
@@ -77,6 +81,7 @@ void   BlueSynthAudioProcessor::changeProgramName (int, const juce::String& name
 //==============================================================================
 void BlueSynthAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
+    renderSampleRate = sampleRate;
     masterGain.reset (sampleRate, 0.01);
     masterGain.setCurrentAndTargetValue (apvts.getRawParameterValue ("MASTERGAIN")->load());
     synth.setCurrentPlaybackSampleRate (sampleRate);
@@ -243,13 +248,46 @@ void BlueSynthAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
     osc1Display.prepareBlock (buffer.getNumSamples());
     osc2Display.prepareBlock (buffer.getNumSamples());
 
+    double bpm = 120, ppq = 0;
+    bool playing = false, hasPPQ = false;
+    if (auto* playHead = getPlayHead())
+        if (auto position = playHead->getPosition())
+        {
+            bpm = position->getBpm().orFallback (120.0);
+            hasPPQ = position->getPpqPosition().hasValue();
+            ppq = position->getPpqPosition().orFallback (0.0);
+            playing = position->getIsPlaying();
+        }
+    modulation.beginBlock (renderSampleRate, buffer.getNumSamples(), bpm, ppq, playing, hasPPQ);
+    const bool sampleAccurateModulation = modulation.voiceActive || modulation.active (Modulation::master);
+    synth.setMinimumRenderingSubdivisionSize (sampleAccurateModulation ? 1 : 32, sampleAccurateModulation);
     synth.renderNextBlock (buffer, midiMessages, 0, buffer.getNumSamples());
     masterGain.setTargetValue (apvts.getRawParameterValue ("MASTERGAIN")->load());
-    masterGain.applyGain (buffer, buffer.getNumSamples());
+    if (!modulation.active (Modulation::master)) masterGain.applyGain (buffer, buffer.getNumSamples());
+    auto event = midiMessages.begin();
+    for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
+    {
+        while (event != midiMessages.end() && (*event).samplePosition <= sample)
+        {
+            if ((*event).getMessage().isNoteOn()) modulation.masterPhase.fill (0);
+            ++event;
+        }
+        if (modulation.active (Modulation::master))
+        {
+            const auto values = modulation.valuesAt (modulation.masterPhase, sample);
+            const auto level = modulation.apply (Modulation::master, masterGain.getNextValue(), values);
+            for (int ch = 0; ch < buffer.getNumChannels(); ++ch) buffer.getWritePointer(ch)[sample] *= level;
+            modulation.publishDisplay (Modulation::master, level);
+        }
+        modulation.advance (modulation.masterPhase, 1);
+    }
+    for (int source = 0; source < 2; ++source)
+        modulation.displayPhase[source].store ((float) (modulation.retrigger[source] ? modulation.masterPhase[source] : modulation.freeStart[source]), std::memory_order_relaxed);
+    modulation.endBlock (buffer.getNumSamples());
 
     // After rendering: if no display voice is sounding, keep the visualizer's live-cutoff
     // atomics tracking the CUTOFF knobs so the curve dot doesn't freeze at a stale value.
-    voiceState.publishIdleCutoffs (filterCutoff, filterCutoff2);
+    voiceState.publishIdleFilterValues (filterCutoff, filterCutoff2, filterRes, filterRes2);
 
     // Clip detection, on the real signal rather than the UI's gain-boosted display copy.
     // The per-osc accumulators are still populated here (publishBlock only copies them
@@ -283,6 +321,8 @@ float BlueSynthAudioProcessor::getOsc2DisplayHz() const { return voiceState.last
 
 float BlueSynthAudioProcessor::getFilter1LiveCutoffHz() const { return voiceState.lastFilter1Cutoff.load (std::memory_order_relaxed); }
 float BlueSynthAudioProcessor::getFilter2LiveCutoffHz() const { return voiceState.lastFilter2Cutoff.load (std::memory_order_relaxed); }
+float BlueSynthAudioProcessor::getFilter1LiveResonance() const { return voiceState.lastFilter1Res.load (std::memory_order_relaxed); }
+float BlueSynthAudioProcessor::getFilter2LiveResonance() const { return voiceState.lastFilter2Res.load (std::memory_order_relaxed); }
 
 //==============================================================================
 bool BlueSynthAudioProcessor::hasEditor() const { return true; }
@@ -295,7 +335,7 @@ juce::AudioProcessorEditor* BlueSynthAudioProcessor::createEditor()
 //==============================================================================
 void BlueSynthAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
-    auto state = apvts.copyState();
+    auto state = modulation.copyState();
     state.setProperty ("presetName", presetManager.getCurrentPresetName(), nullptr);
     std::unique_ptr<juce::XmlElement> xml (state.createXml());
     if (xml != nullptr)
@@ -320,8 +360,10 @@ void BlueSynthAudioProcessor::setStateInformation (const void* data, int sizeInB
                     state.appendChild (parameter, nullptr);
                 }
             }
+            Modulation::Engine::migrate (state);
             presetManager.setCurrentPresetName (state.getProperty ("presetName").toString(), false);
-            apvts.replaceState (state);
+            modulation.replaceState (state);
+            undoManager.clearUndoHistory ();
         }
     }
 }
@@ -442,5 +484,6 @@ juce::AudioProcessorValueTreeState::ParameterLayout BlueSynthAudioProcessor::cre
 
     // Off: glide only between overlapping (legato) notes. On: glide into every note.
     params.push_back (std::make_unique<juce::AudioParameterBool> (juce::ParameterID { "GLIDEALWAYS", 1 }, "Glide Always", false));
+    Modulation::Engine::addParameters (params);
     return { params.begin(), params.end() };
 }

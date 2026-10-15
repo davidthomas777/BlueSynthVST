@@ -96,7 +96,7 @@ void FilterCurveComponent::paint (juce::Graphics& g)
     // envelope is currently adding — so the rolloff itself slides as the envelope sweeps,
     // Serum-style, with the dot riding its knee. Drawing from the base knob value instead
     // left the curve frozen while only the dot moved. When idle the live value settles to
-    // the knob position (publishIdleCutoffs), so the static picture is unchanged.
+    // the knob position, so the static picture is unchanged.
     const float drawCutoff = juce::jlimit (kMinFreq, kMaxFreq, liveCutoff);
 
     // A wide-open low pass is genuinely bypassed in the DSP (see filterIsBypassed in

@@ -31,6 +31,22 @@ BlueSynthAudioProcessorEditor
 
 `PluginProcessor` owns the audio objects and is called by the host. `PluginEditor` owns the controls and runs on JUCE's message thread. The editor never renders audio and the processor never depends on the editor being open.
 
+## LFO ownership and rendering
+
+`Modulation::Engine` belongs to the processor, after APVTS and before the synthesiser and voices. A fixed registry maps all 39 destinations to their parameter IDs, limits and modulation domains. Timing parameters and two routes per destination are appended to the existing parameter layout. Rendering reads cached atomic parameter pointers once per block and never writes modulation into APVTS.
+
+Each voice owns two retrigger phases. The processor owns free phases and master-gain phases. Free phase at an absolute sample offset is derived from the block's clock origin, so sequential voice rendering does not advance a shared clock repeatedly. With modulation active, the synthesiser uses one-sample MIDI subdivision and records event offsets before starting/releasing voices; otherwise it retains the original subdivision. Host PPQ supplies the synced free origin while playing; note-retrigger cycles use tempo without following seeks.
+
+Unassigned, zero-depth and bypassed voice routes retain the block renderer. Active voice modulation evaluates both LFOs per sample and uses prepared buffers and oscillator storage. Pitch modulation is applied after the carrier's base-frequency smoother; gain and cutoff/resonance modulation follow their base smoothers. Unison membership, pan and normalization contributions ramp over 5 ms. `AdsrData` retains the JUCE path for unmodulated notes and advances a separate envelope when routed. Attack, decay, release and sustain follow the LFO during their active stages. A routed glide advances its progress using the current modulated duration; without a route, its note-on duration remains fixed.
+
+Curve edits compile two 2049-entry tables outside rendering. A three-slot exchange transfers complete table snapshots: the producer and consumer each own a slot and exchange ownership through one atomic middle slot. The audio consumer makes one bounded compare/exchange attempt per block; it never locks or waits. Multiple state/UI writers serialize with a non-audio critical section. Host and preset state snapshots/replacements use that same writer guard. Versioned `LFOShapes` children live inside the unchanged `Parameters` root; malformed curves fall back to sine. Legacy loads insert defaults for missing LFO parameters, clearing old assignments.
+
+`ModSlider` is a reusable drag destination for the existing rotary controls and envelope faders. It preserves normal slider attachments and base editing, and opens per-source route controls. Live destination values are written during rendering, while their validity is published only after the block completes; the UI therefore sees either the preceding complete block or the next complete block, never a transient invalid state between them. ADSR and Glide destinations keep publishing their LFO positions while a note renders, including after the affected stage or glide ends. `LfoComponent` owns the two-tab curve/timing panel below the piano. The existing 60 Hz editor timer repaints modulation indicators from atomics. LFO controls, buttons and selectors are not modulation destinations.
+
+A processor-owned `juce::UndoManager` backs APVTS attachments, modulation routes and LFO-shape tree edits. The editor's top-right buttons poll its undo/redo availability. Curve drags form one transaction, and preset or host-state replacement clears history so actions never retain references to a replaced state tree.
+
+The new path adds no buffer allocation, file access or blocking lock during normal rendering. This does not extend the existing allocation audit to arbitrary host block sizes, JUCE internals or every legacy path. Offline timing is reported by the regression runner; DAW listening, project recall and sanitizer runs remain separate validation activities.
+
 ## Plugin startup and preparation
 
 `BlueSynthAudioProcessor` creates the parameter layout, one `SynthSound`, and 32 `SynthVoice` objects. Each voice is connected to the processor-owned visualizer buffers. The processor also creates a `PresetManager` and a `MidiKeyboardState`.
@@ -88,7 +104,7 @@ After the synthesiser renders, the processor applies master gain. It reads the a
 On note-on, `SynthVoice::startNote`:
 
 1. Converts the MIDI note to Hz.
-2. Starts a glide from the previous target pitch when the portamento time is non-zero and either another key is still held (legato, tracked by `BlueSynthesiser::heldKeys`) or `GLIDEALWAYS` is on. The glide is linear in semitones over exactly the portamento time, stepped once per block.
+2. Starts a glide from the previous target pitch when the initial portamento time is non-zero and either another key is still held (legato, tracked by `BlueSynthesiser::heldKeys`) or `GLIDEALWAYS` is on. The glide is linear in semitones. An unmodulated glide uses its note-on duration; a routed glide adjusts its progress from the current LFO duration each sample.
 3. Marks the voice as held.
 4. Claims the newest-note display slot for the oscilloscope.
 5. Computes oscillator frequencies, including pitch, octave, oscillator pitch, and unison detune, then snaps each oscillator's carrier smoother to that frequency. Gain and base filter smoothers also snap to the current settings so a reused voice does not inherit another note's unfinished parameter ramps.
@@ -140,7 +156,7 @@ The two oscillator chains are independent until the final mix. If an oscillator 
 12. Trapezoid
 13. Stepped saw
 
-`OscData` owns a 50 ms linear carrier-frequency smoother. At a steady frequency without FM, JUCE processes the oscillator as a block. During a pitch ramp or with FM enabled, `OscData` processes samples individually: it advances the carrier smoother, adds any FM deviation, sets the instantaneous frequency without additional JUCE smoothing, renders the carrier, and writes the result to each output channel. Switching FM off retains an in-progress carrier ramp; note starts snap it to the assigned pitch. Existing portamento targets still advance per render block, so this does not make the glide trajectory sample-accurate.
+`OscData` owns a 50 ms linear carrier-frequency smoother. At a steady frequency without FM, JUCE processes the oscillator as a block. During a pitch ramp or with FM enabled, `OscData` processes samples individually: it advances the carrier smoother, adds any FM deviation, sets the instantaneous frequency without additional JUCE smoothing, renders the carrier, and writes the result to each output channel. Switching FM off retains an in-progress carrier ramp; note starts snap it to the assigned pitch. Unmodulated portamento targets advance per render block; an active Glide LFO advances them per sample.
 
 The current sine path uses a range-reduced polynomial for Sine, Rectified Sine, and the FM modulator. It avoids a library `sin` call for the normal `-π` to `π` phase range. The measured maximum pointwise error is approximately `1.2e-7`; the normal patch FM tests were below approximately `-113 dB` relative error.
 
@@ -184,7 +200,7 @@ The processor owns a `SynthVoice::SharedState` that outlives its voices. It hold
 
 `OscilloscopeComponent` keeps a short ring of audio samples, chooses a window based on the selected voice's frequency, searches for a rising zero crossing, and min/max decimates samples into screen columns. The editor applies visual-only tanh shaping before pushing data into the scope. This shaping does not alter the plugin's audio output.
 
-`FilterCurveComponent` calculates the response from filter type, cutoff, resonance, and sample rate. The editor polls the live cutoff at 60 Hz. When no voice is active, the processor publishes the base knob cutoff, so moving the cutoff while idle updates the curve immediately. The graph spans the full 20 Hz–20 kHz parameter range on a logarithmic x-axis.
+`FilterCurveComponent` calculates the response from filter type, cutoff, resonance, and sample rate. The editor polls the live cutoff and resonance at 60 Hz. When no voice is active, the processor publishes both base knob values, so idle edits update the curve immediately. The graph spans the full 20 Hz–20 kHz parameter range on a logarithmic x-axis.
 
 ## Editor and controls
 

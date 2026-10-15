@@ -747,6 +747,8 @@ static void automationConsistency()
         }
 }
 
+#include "LfoTests.h"
+
 int main()
 {
     juce::ScopedJuceInitialiser_GUI init;
@@ -767,7 +769,17 @@ int main()
                              std::make_pair ("Master and oscillator gain smoothing", gainSmoothing),
                              std::make_pair ("Cutoff smoothing and muted progress", cutoffSmoothing),
                              std::make_pair ("Pitch smoothing with FM transitions", pitchSmoothing),
-                             std::make_pair ("Rapid automation audio across buffer sizes", automationConsistency) })
+                             std::make_pair ("Rapid automation audio across buffer sizes", automationConsistency),
+                             std::make_pair ("LFO timing and MIDI offsets", lfoTiming),
+                             std::make_pair ("LFO destinations and neutral routing", lfoRouting),
+                             std::make_pair ("LFO state and concurrent table edits", lfoState),
+                             std::make_pair ("LFO drag targets and panel", lfoInterface),
+                             std::make_pair ("LFO envelope live timing", lfoEnvelopeTiming),
+                             std::make_pair ("LFO resonance display and glide", lfoResonanceAndGlide),
+                             std::make_pair ("LFO display marker lifetime", lfoDisplayLifetime),
+                             std::make_pair ("LFO display render lifecycle", lfoDisplayRenderLifecycle),
+                             std::make_pair ("Undo and redo history", undoRedoHistory),
+                             std::make_pair ("LFO dense-polyphony CPU comparison", lfoCpu) })
     {
         try { test.second(); std::cout << "PASS " << test.first << '\n'; }
         catch (const std::exception& e) { ++failures; std::cerr << "FAIL " << test.first << ": " << e.what() << '\n'; }
