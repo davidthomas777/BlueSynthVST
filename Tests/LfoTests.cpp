@@ -1,6 +1,13 @@
-#pragma once
+#include "TestSupport.h"
+#include "TestCases.h"
 #include "UI/ModSlider.h"
+#include "UI/LfoComponent.h"
 #include <chrono>
+#include <cstdlib>
+#include <functional>
+#include <iostream>
+#include <limits>
+#include <thread>
 
 static void route (BlueSynthAudioProcessor &p, int source, int target, float depth)
 {
@@ -59,7 +66,7 @@ static std::vector<float> lfoAudio (int block, int destination = -1, float depth
     }
     return output;
 }
-static void lfoTiming ()
+void lfoTiming ()
 {
     BlueSynthAudioProcessor p;
     auto &e = p.modulation;
@@ -93,7 +100,7 @@ static void lfoTiming ()
         }
     }
 }
-static void lfoRouting ()
+void lfoRouting ()
 {
     const auto dry = lfoAudio (128);
     for (int t = 0; t < Modulation::count; ++t)
@@ -120,13 +127,16 @@ static void lfoRouting ()
     require (e.apply (Modulation::cutoff1, 20000, {{1, 1}}) == 20000, "Modulation not clamped");
     require (p.apvts.getRawParameterValue ("FILTERCUTOFF")->load () == 20000, "Modulation wrote to base parameter");
 }
-static void lfoState ()
+void lfoState ()
 {
     BlueSynthAudioProcessor p;
+    int shapeNotifications = 0;
+    p.modulation.onShapeChanged = [&] { ++shapeNotifications; };
     route (p, 1, Modulation::pitch1, -.27f);
     auto shape = Modulation::Shape::preset (1);
     shape.points[0].curve = .3f;
     p.modulation.setShape (1, shape);
+    require (shapeNotifications == 1, "One curve edit published more than once");
     set (p, "LFO2_RATE", 4.7f);
     set (p, "LFO2_SYNC", 1);
     set (p, "LFO2_DIVISION", 20);
@@ -136,6 +146,10 @@ static void lfoState ()
     restored.setStateInformation (data.getData (), (int)data.getSize ());
     require (restored.modulation.getShape (1).size == 3 && restored.modulation.getShape (1).points[0].curve == .3f,
              "Curve state lost");
+    p.modulation.beginBlock (48000, 1, 120, 0, false, false);
+    restored.modulation.beginBlock (48000, 1, 120, 0, false, false);
+    require (std::abs (restored.modulation.value (1, .37) - p.modulation.value (1, .37)) < .001f,
+             "Restored curve table differs from the saved shape");
     require (std::abs (restored.apvts.getRawParameterValue ("LFO2_OSC1PITCH_DEPTH")->load () + .27f) < .001f,
              "Route state lost");
     auto legacy = p.apvts.copyState ();
@@ -152,6 +166,27 @@ static void lfoState ()
     require (restored.apvts.getRawParameterValue ("LFO2_OSC1PITCH_ON")->load () == 0,
              "Legacy restore retained modulation routes");
     require (restored.modulation.getShape (1).sine, "Legacy restore retained custom shape");
+    auto malformed = [&] (const std::function<void (juce::ValueTree)> &change, const char *message)
+    {
+        auto state = p.modulation.copyState ();
+        auto root = state.getChildWithName ("LFOShapes");
+        auto curve = root.getChildWithName ("LFO2");
+        require (curve.isValid (), "Missing LFO shape in malformed-state test");
+        change (curve);
+        juce::MemoryBlock badData;
+        juce::AudioProcessor::copyXmlToBinary (*state.createXml (), badData);
+        restored.setStateInformation (badData.getData (), (int) badData.getSize ());
+        require (restored.modulation.getShape (1).sine, message);
+    };
+    malformed ([] (juce::ValueTree curve)
+               { curve.getChild (1).setProperty ("x", std::numeric_limits<float>::infinity (), nullptr); },
+               "Non-finite curve position was accepted from XML");
+    malformed ([] (juce::ValueTree curve) { curve.getChild (1).setProperty ("y", 1.2f, nullptr); },
+               "Out-of-range curve value was accepted from XML");
+    malformed ([] (juce::ValueTree curve) { curve.getChild (1).setProperty ("x", 0.0f, nullptr); },
+               "Non-monotonic curve points were accepted from XML");
+    malformed ([] (juce::ValueTree curve) { curve.getChild (0).setProperty ("x", .1f, nullptr); },
+               "Invalid curve endpoint was accepted from XML");
     shape.points[1].x = -1;
     restored.modulation.setShape (1, shape);
     require (restored.modulation.getShape (1).sine, "Malformed curve was not rejected");
@@ -169,7 +204,7 @@ static void lfoState ()
         p.modulation.setShape (i % 2, Modulation::Shape::preset (i % 5));
     audio.join ();
 }
-static void lfoInterface ()
+void lfoInterface ()
 {
     BlueSynthAudioProcessor p;
     std::unique_ptr<juce::AudioProcessorEditor> editor (p.createEditor ());
@@ -202,7 +237,7 @@ static void lfoInterface ()
         png.writeImageToStream (image, *stream);
     }
 }
-static void lfoEnvelopeTiming ()
+void lfoEnvelopeTiming ()
 {
     for (int first : {Modulation::attack1, Modulation::envAttack1,
                       Modulation::attack2, Modulation::envAttack2})
@@ -266,7 +301,7 @@ static void lfoEnvelopeTiming ()
         require (r - s < (beforeRelease - r) * .8f, "Release time did not respond while running");
     }
 }
-static void lfoResonanceAndGlide ()
+void lfoResonanceAndGlide ()
 {
     BlueSynthAudioProcessor p;
     set (p, "OSC2ENABLED", 1);
@@ -311,7 +346,7 @@ static void lfoResonanceAndGlide ()
     for (int i = 0; i < 250; ++i) render (p);
     require (p.modulation.hasDisplayValue (Modulation::glide), "Glide marker stopped after pitch arrived");
 }
-static void lfoDisplayLifetime ()
+void lfoDisplayLifetime ()
 {
     BlueSynthAudioProcessor p;
     auto &e = p.modulation;
@@ -349,8 +384,39 @@ static void lfoDisplayLifetime ()
         for (int x = 0; x < idle.getWidth (); ++x)
             require (idle.getPixelAt (x, y) == cleared.getPixelAt (x, y),
                      "Idle LFO knob still painted its live marker");
+
+    LfoComponent panel (e);
+    panel.setBounds (0, 0, 620, 192);
+    e.displayPhase[0].store (.5f);
+    e.displayRateHz[0].store (1.0f);
+    panel.refresh ();
+    const auto idleCurve = panel.createComponentSnapshot (panel.getLocalBounds ());
+    e.noteSounding.store (true);
+    panel.refresh ();
+    const auto activeCurve = panel.createComponentSnapshot (panel.getLocalBounds ());
+    int playheadPixels = 0;
+    for (int y = 0; y < idleCurve.getHeight (); ++y)
+        for (int x = 0; x < idleCurve.getWidth (); ++x)
+            playheadPixels += idleCurve.getPixelAt (x, y) != activeCurve.getPixelAt (x, y);
+    require (playheadPixels > 0, "LFO playhead was hidden during note playback");
+    e.displayRateHz[0].store (5.0f);
+    panel.refresh ();
+    const auto fastCurve = panel.createComponentSnapshot (panel.getLocalBounds ());
+    int fastMarkerPixels = 0;
+    for (int y = 0; y < idleCurve.getHeight (); ++y)
+        for (int x = 0; x < idleCurve.getWidth (); ++x)
+            fastMarkerPixels += idleCurve.getPixelAt (x, y) != fastCurve.getPixelAt (x, y);
+    require (fastMarkerPixels > 0 && fastMarkerPixels < playheadPixels / 3,
+             "Fast LFO still painted a full-height playhead");
+    e.noteSounding.store (false);
+    panel.refresh ();
+    const auto stoppedCurve = panel.createComponentSnapshot (panel.getLocalBounds ());
+    for (int y = 0; y < idleCurve.getHeight (); ++y)
+        for (int x = 0; x < idleCurve.getWidth (); ++x)
+            require (idleCurve.getPixelAt (x, y) == stoppedCurve.getPixelAt (x, y),
+                     "LFO playhead remained visible after playback stopped");
 }
-static void lfoDisplayRenderLifecycle ()
+void lfoDisplayRenderLifecycle ()
 {
     BlueSynthAudioProcessor p;
     set (p, "ATTACK", 0);
@@ -372,6 +438,7 @@ static void lfoDisplayRenderLifecycle ()
     p.prepareToPlay (48000, 128);
 
     render (p, 60);
+    require (p.modulation.noteSounding.load (), "Played note did not activate the LFO playhead");
     require (p.modulation.hasDisplayValue (Modulation::cutoff1), "Played note did not publish cutoff LFO marker");
     require (p.modulation.hasDisplayValue (Modulation::envAmount1),
              "Played note did not publish envelope-amount LFO marker");
@@ -379,11 +446,13 @@ static void lfoDisplayRenderLifecycle ()
              "Live filter cutoff omitted the simultaneous envelope contribution");
 
     render (p, 60, false);
+    require (p.modulation.noteSounding.load (), "Release tail stopped the LFO playhead early");
     require (p.modulation.hasDisplayValue (Modulation::cutoff1) &&
                  p.modulation.hasDisplayValue (Modulation::envAmount1),
              "LFO markers disappeared before the release tail ended");
     for (int block = 0; block < 20; ++block)
         render (p);
+    require (!p.modulation.noteSounding.load (), "LFO playhead remained active after the release tail");
     require (!p.modulation.hasDisplayValue (Modulation::cutoff1) &&
                  !p.modulation.hasDisplayValue (Modulation::envAmount1),
              "LFO markers remained after the rendered release tail");
@@ -395,7 +464,7 @@ static void lfoDisplayRenderLifecycle ()
                  !p.modulation.hasDisplayValue (Modulation::envAmount1),
              "Editing LFO depth while idle restored stale markers");
 }
-static void undoRedoHistory ()
+void undoRedoHistory ()
 {
     BlueSynthAudioProcessor p;
     auto *cutoff = p.apvts.getParameter ("FILTERCUTOFF");
@@ -403,7 +472,8 @@ static void undoRedoHistory ()
     const float originalCutoff = p.apvts.getRawParameterValue ("FILTERCUTOFF")->load ();
     juce::ParameterAttachment attachment (*cutoff, [] (float) {}, &p.undoManager);
     attachment.beginGesture ();
-    attachment.setValueAsPartOfGesture (2345);
+    for (int i = 0; i < 50; ++i)
+        attachment.setValueAsPartOfGesture (1000.0f + 1345.0f * i / 49.0f);
     attachment.endGesture ();
     p.apvts.copyState (); // flush the attachment edit into the undoable ValueTree
     require (std::abs (p.apvts.getRawParameterValue ("FILTERCUTOFF")->load () - 2345) < 1,
@@ -414,6 +484,39 @@ static void undoRedoHistory ()
     require (p.undoManager.redo (), "Parameter edit was not redoable");
     require (std::abs (p.apvts.getRawParameterValue ("FILTERCUTOFF")->load () - 2345) < 1,
              "Redo did not restore cutoff edit");
+
+    BlueSynthAudioProcessor routing;
+    auto *routeCutoff = routing.apvts.getParameter ("FILTERCUTOFF");
+    juce::ParameterAttachment routeAttachment (*routeCutoff, [] (float) {}, &routing.undoManager);
+    routeAttachment.beginGesture ();
+    routeAttachment.setValueAsPartOfGesture (2345);
+    routeAttachment.endGesture ();
+    routing.apvts.copyState ();
+    const auto depthID = Modulation::routeID (0, Modulation::cutoff1, "DEPTH");
+    const auto bypassID = Modulation::routeID (0, Modulation::cutoff1, "BYPASS");
+    set (routing, depthID.toRawUTF8 (), .37f);
+    set (routing, bypassID.toRawUTF8 (), 1);
+    routing.apvts.copyState ();
+    routing.undoManager.beginNewTransaction ();
+    routing.modulation.setRouteAssigned (0, Modulation::cutoff1, true);
+    routing.apvts.copyState ();
+    require (routing.apvts.getRawParameterValue (depthID)->load () == 0 &&
+                 routing.apvts.getRawParameterValue (bypassID)->load () == 0,
+             "Assigning an LFO did not reset the prior route settings");
+    require (routing.undoManager.undo (), "Route assignment was not undoable");
+    require (routing.apvts.getRawParameterValue (Modulation::routeID (0, Modulation::cutoff1, "ON"))->load () == 0 &&
+                 std::abs (routing.apvts.getRawParameterValue (depthID)->load () - .37f) < .001f &&
+                 routing.apvts.getRawParameterValue (bypassID)->load () == 1,
+             "One undo did not restore the complete previous route");
+    require (std::abs (routing.apvts.getRawParameterValue ("FILTERCUTOFF")->load () - 2345) < 1,
+             "Undoing a route also reverted an earlier cutoff edit");
+    routing.modulation.setRouteAssigned (0, Modulation::cutoff1, true);
+    routing.apvts.copyState ();
+    routing.modulation.setRouteAssigned (0, Modulation::cutoff1, false);
+    routing.apvts.copyState ();
+    require (routing.undoManager.undo () &&
+                 routing.apvts.getRawParameterValue (Modulation::routeID (0, Modulation::cutoff1, "ON"))->load () == 1,
+             "Undoing route removal did not restore the assignment");
 
     auto triangle = Modulation::Shape::preset (1);
     p.modulation.setShape (0, triangle);
@@ -437,7 +540,7 @@ static void undoRedoHistory ()
     require (undo->getY () < editor->getHeight () / 4 && redo->getY () == undo->getY (),
              "Undo/redo buttons are not in the top row");
 }
-static void lfoCpu ()
+void lfoCpu ()
 {
     auto measure = [] (bool modulation)
     {

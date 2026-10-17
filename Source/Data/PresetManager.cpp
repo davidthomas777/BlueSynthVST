@@ -1,15 +1,18 @@
 #include "PresetManager.h"
 #include "Modulation.h"
+#include <utility>
 
 const juce::String PresetManager::presetFileExtension = ".xml";
 
-PresetManager::PresetManager()
+PresetManager::PresetManager (juce::File directory) : presetDirectoryOverride (std::move (directory))
 {
     ensurePresetDirectoryExists();
 }
 
 juce::File PresetManager::getPresetDirectory() const
 {
+    if (presetDirectoryOverride != juce::File ())
+        return presetDirectoryOverride;
     return juce::File::getSpecialLocation (juce::File::userDocumentsDirectory)
                        .getChildFile ("BlueSynth")
                        .getChildFile ("Presets");
@@ -67,8 +70,14 @@ bool PresetManager::loadPreset (juce::AudioProcessorValueTreeState& apvts, const
     state.setProperty ("presetName", name, nullptr);
     // Parameter notifications can cause the host to request state during replacement.
     setCurrentPresetName (name, false);
-    if(modulation != nullptr) modulation->replaceState(state);
-    else apvts.replaceState (state);
+    if (modulation != nullptr)
+        modulation->replaceState (state);
+    else
+    {
+        apvts.replaceState (state);
+        if (apvts.undoManager != nullptr)
+            apvts.undoManager->clearUndoHistory ();
+    }
     if (onPresetChanged)
         onPresetChanged();
     return true;

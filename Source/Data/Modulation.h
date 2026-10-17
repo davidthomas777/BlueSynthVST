@@ -1,5 +1,6 @@
 #pragma once
 #include <JuceHeader.h>
+#include <cstdint>
 
 namespace Modulation
 {
@@ -188,6 +189,7 @@ class Engine : private juce::ValueTree::Listener
     static void migrate (juce::ValueTree &);
     Shape getShape (int) const;
     void setShape (int, const Shape &);
+    void setRouteAssigned (int source, int target, bool assigned);
     juce::ValueTree copyState ()
     {
         const juce::ScopedLock lock (writerLock);
@@ -235,6 +237,9 @@ class Engine : private juce::ValueTree::Listener
     std::array<std::atomic<float>, count> display{};
     std::array<std::atomic<bool>, count> displayValid{};
     std::array<std::atomic<float>, 2> displayPhase{};
+    std::array<std::atomic<float>, 2> displayRateHz{};
+    std::array<std::atomic<uint32_t>, 2> displayRetriggerCount{};
+    std::atomic<bool> noteSounding{false};
     std::atomic<int> selectedSource{0};
     juce::AudioProcessorValueTreeState &state;
     std::function<void ()> onShapeChanged;
@@ -254,6 +259,7 @@ class Engine : private juce::ValueTree::Listener
     int front = 0, back = 2;
     std::atomic<int> middle{1};
     mutable juce::CriticalSection writerLock;
+    bool suppressShapeNotifications = false;
     void publishShapes ();
     bool isShapeState (juce::ValueTree tree) const
     {
@@ -267,6 +273,9 @@ class Engine : private juce::ValueTree::Listener
     }
     void shapeStateChanged ()
     {
+        const juce::ScopedLock lock (writerLock);
+        if (suppressShapeNotifications)
+            return;
         publishShapes ();
         if (onShapeChanged)
             onShapeChanged ();

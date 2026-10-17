@@ -1,4 +1,5 @@
 #include "LfoComponent.h"
+#include <cmath>
 
 LfoComponent::LfoComponent (Modulation::Engine &e) : engine (e)
 {
@@ -79,6 +80,7 @@ void LfoComponent::select (int s)
     shapes.setSelectedId (engine.getShape (s).sine ? 1 : 0, juce::dontSendNotification);
     handle.setButtonText ("DRAG LFO " + juce::String (s + 1));
     refresh ();
+    curve.resetPlayhead ();
 }
 void LfoComponent::refresh ()
 {
@@ -98,6 +100,7 @@ void LfoComponent::refresh ()
     rate.setEnabled (!sync.getToggleState ());
     division.setEnabled (sync.getToggleState ());
     curve.repaint ();
+    curve.setPlaybackActive (engine.noteSounding.load (std::memory_order_acquire));
 }
 void LfoComponent::paint (juce::Graphics &g)
 {
@@ -131,23 +134,72 @@ void LfoComponent::resized ()
     b.removeFromBottom (8);
     curve.setBounds (b);
 }
+float LfoComponent::Curve::yForValue (float value) const
+{
+    return verticalInset + (1.0f - value) * ((float) getHeight () - 2.0f * verticalInset);
+}
 juce::Point<float> LfoComponent::Curve::normal (const juce::MouseEvent &e) const
 {
     return {juce::jlimit (0.0f, 1.0f, e.position.x / (float)getWidth ()),
-            juce::jlimit (0.0f, 1.0f, 1 - e.position.y / (float)getHeight ())};
+            juce::jlimit (0.0f, 1.0f, 1.0f - (e.position.y - verticalInset) /
+                                                   ((float) getHeight () - 2.0f * verticalInset))};
+}
+void LfoComponent::Curve::resetPlayhead ()
+{
+    playheadPhase = owner.engine.displayPhase[owner.source].load (std::memory_order_relaxed);
+    lastRetriggerCount = owner.engine.displayRetriggerCount[owner.source].load (std::memory_order_relaxed);
+    lastFrameMs = juce::Time::getMillisecondCounterHiRes ();
+    repaint ();
+}
+void LfoComponent::Curve::setPlaybackActive (bool active)
+{
+    if (active == playbackActive) return;
+    playbackActive = active;
+    if (active)
+    {
+        resetPlayhead ();
+        startTimerHz (120);
+    }
+    else
+    {
+        stopTimer ();
+        repaint ();
+    }
+}
+void LfoComponent::Curve::timerCallback ()
+{
+    if (!owner.engine.noteSounding.load (std::memory_order_acquire))
+    {
+        setPlaybackActive (false);
+        return;
+    }
+    const double now = juce::Time::getMillisecondCounterHiRes ();
+    const auto count = owner.engine.displayRetriggerCount[owner.source].load (std::memory_order_relaxed);
+    if (count != lastRetriggerCount)
+        resetPlayhead ();
+    else
+    {
+        const double elapsed = juce::jmax (0.0, now - lastFrameMs) * 0.001;
+        const double rate = owner.engine.displayRateHz[owner.source].load (std::memory_order_relaxed);
+        playheadPhase = (float) std::fmod (playheadPhase + elapsed * rate, 1.0);
+        lastFrameMs = now;
+    }
+    repaint ();
 }
 void LfoComponent::Curve::paint (juce::Graphics &g)
 {
+    g.fillAll (juce::Colour (0xff4a90e2));
     auto s = owner.engine.getShape (owner.source);
-    g.setColour (juce::Colours::white.withAlpha (.2f));
+    g.setColour (juce::Colours::white.withAlpha (.12f));
     for (int i = 0; i <= 8; ++i)
-        g.drawVerticalLine (getWidth () * i / 8, 0, (float)getHeight ());
+        g.drawVerticalLine (getWidth () * i / 8, 0, (float) getHeight ());
+    g.setColour (juce::Colours::white.withAlpha (.2f));
     for (int i = 0; i <= 4; ++i)
         g.drawHorizontalLine (getHeight () * i / 4, 0, (float)getWidth ());
     juce::Path path;
     for (int x = 0; x <= getWidth (); ++x)
     {
-        float y = (1 - s.evaluate ((float)x / getWidth ())) * getHeight ();
+        float y = yForValue (s.evaluate ((float)x / getWidth ()));
         if (x == 0)
             path.startNewSubPath (0, y);
         else
@@ -157,9 +209,22 @@ void LfoComponent::Curve::paint (juce::Graphics &g)
     g.strokePath (path, juce::PathStrokeType (1.5f));
     if (!s.sine)
         for (int i = 0; i < s.size; ++i)
-            g.fillEllipse (s.points[i].x * getWidth () - 3, (1 - s.points[i].y) * getHeight () - 3, 6, 6);
-    g.setColour (juce::Colours::white.withAlpha (.6f));
-    g.drawVerticalLine ((int)(owner.engine.displayPhase[owner.source].load () * getWidth ()), 0, (float)getHeight ());
+            g.fillEllipse (s.points[i].x * getWidth () - 3, yForValue (s.points[i].y) - 3, 6, 6);
+    if (playbackActive)
+    {
+        const float x = playheadPhase * getWidth ();
+        if (owner.engine.displayRateHz[owner.source].load (std::memory_order_relaxed) > 3.0f)
+        {
+            const float y = yForValue (s.evaluate (playheadPhase));
+            g.setColour (juce::Colours::white);
+            g.fillEllipse (x - 4.0f, y - 4.0f, 8.0f, 8.0f);
+        }
+        else
+        {
+            g.setColour (juce::Colours::white.withAlpha (.6f));
+            g.drawLine (x, 0.0f, x, (float) getHeight (), 1.0f);
+        }
+    }
 }
 void LfoComponent::Curve::mouseDown (const juce::MouseEvent &e)
 {
@@ -180,7 +245,7 @@ void LfoComponent::Curve::mouseDown (const juce::MouseEvent &e)
     for (int i = 0; i < shape.size; ++i)
     {
         float distance =
-            e.position.getDistanceFrom ({shape.points[i].x * getWidth (), (1 - shape.points[i].y) * getHeight ()});
+            e.position.getDistanceFrom ({shape.points[i].x * getWidth (), yForValue (shape.points[i].y)});
         if (distance < nearest)
         {
             nearest = distance;

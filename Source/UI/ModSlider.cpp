@@ -2,15 +2,6 @@
 
 namespace
 {
-void setParameter (juce::AudioProcessorValueTreeState &state, const juce::String &id, float value)
-{
-    if (auto *p = state.getParameter (id))
-    {
-        p->beginChangeGesture ();
-        p->setValueNotifyingHost (p->convertTo0to1 (value));
-        p->endChangeGesture ();
-    }
-}
 class RouteLookAndFeel : public AppLookAndFeel
 {
 public:
@@ -31,7 +22,7 @@ public:
 class RouteEditor : public juce::Component
 {
   public:
-    RouteEditor (Modulation::Engine &engine, int source, int target) : state (engine.state), s (source), t (target)
+    RouteEditor (Modulation::Engine &engine, int source, int target) : engine (engine), state (engine.state), s (source), t (target)
     {
         setLookAndFeel (&look);
         title.setText ("LFO " + juce::String (s + 1) + " > " + Modulation::destinations[t].id,
@@ -63,7 +54,7 @@ class RouteEditor : public juce::Component
             state, Modulation::routeID (s, t, "BYPASS"), bypass);
         remove.onClick = [this]
         {
-            setParameter (state, Modulation::routeID (s, t, "ON"), 0);
+            this->engine.setRouteAssigned (s, t, false);
             if (auto *callout = findParentComponentOfClass<juce::CallOutBox> ())
                 callout->dismiss ();
         };
@@ -90,6 +81,7 @@ class RouteEditor : public juce::Component
 
   private:
     RouteLookAndFeel look;
+    Modulation::Engine &engine;
     juce::AudioProcessorValueTreeState &state;
     int s, t;
     juce::Label title;
@@ -104,13 +96,7 @@ void ModSlider::editRoute (int source)
     if (engine == nullptr || target < 0)
         return;
     engine->selectedSource.store (source);
-    auto &state = engine->state;
-    if (state.getRawParameterValue (Modulation::routeID (source, target, "ON"))->load () < .5f)
-    {
-        setParameter (state, Modulation::routeID (source, target, "DEPTH"), 0);
-        setParameter (state, Modulation::routeID (source, target, "BYPASS"), 0);
-        setParameter (state, Modulation::routeID (source, target, "ON"), 1);
-    }
+    engine->setRouteAssigned (source, target, true);
     auto *parent = getTopLevelComponent ();
     juce::CallOutBox::launchAsynchronously (std::make_unique<RouteEditor> (*engine, source, target),
                                             parent->getLocalArea (this, getLocalBounds ()), parent);

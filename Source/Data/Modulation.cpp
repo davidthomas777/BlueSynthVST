@@ -2,6 +2,18 @@
 
 namespace Modulation
 {
+namespace
+{
+void setRouteParameter (juce::AudioProcessorValueTreeState &state, const juce::String &id, float value)
+{
+    if (auto *parameter = state.getParameter (id))
+    {
+        parameter->beginChangeGesture ();
+        parameter->setValueNotifyingHost (parameter->convertTo0to1 (value));
+        parameter->endChangeGesture ();
+    }
+}
+}
 void Engine::addParameters (std::vector<std::unique_ptr<juce::RangedAudioParameter>> &parameters)
 {
     for (int s = 0; s < 2; ++s)
@@ -116,28 +128,49 @@ void Engine::setShape (int source, const Shape &shape)
 {
     const juce::ScopedLock lock (writerLock);
     auto *undo = state.undoManager;
-    auto root = state.state.getChildWithName ("LFOShapes");
-    if (!root.isValid ())
     {
-        root = juce::ValueTree ("LFOShapes");
-        state.state.appendChild (root, undo);
+        const juce::ScopedValueSetter<bool> suppress (suppressShapeNotifications, true);
+        auto root = state.state.getChildWithName ("LFOShapes");
+        if (!root.isValid ())
+        {
+            root = juce::ValueTree ("LFOShapes");
+            state.state.appendChild (root, undo);
+        }
+        root.setProperty ("version", 1, undo);
+        auto old = root.getChildWithName ("LFO" + juce::String (source + 1));
+        if (old.isValid ())
+            root.removeChild (old, undo);
+        juce::ValueTree tree ("LFO" + juce::String (source + 1));
+        tree.setProperty ("sine", shape.sine, nullptr);
+        for (int i = 0; i < juce::jlimit (2, 32, shape.size); ++i)
+        {
+            juce::ValueTree p ("Point");
+            p.setProperty ("x", shape.points[i].x, nullptr);
+            p.setProperty ("y", shape.points[i].y, nullptr);
+            p.setProperty ("curve", shape.points[i].curve, nullptr);
+            tree.appendChild (p, nullptr);
+        }
+        root.appendChild (tree, undo);
     }
-    root.setProperty ("version", 1, undo);
-    auto old = root.getChildWithName ("LFO" + juce::String (source + 1));
-    if (old.isValid ())
-        root.removeChild (old, undo);
-    juce::ValueTree tree ("LFO" + juce::String (source + 1));
-    tree.setProperty ("sine", shape.sine, nullptr);
-    for (int i = 0; i < juce::jlimit (2, 32, shape.size); ++i)
-    {
-        juce::ValueTree p ("Point");
-        p.setProperty ("x", shape.points[i].x, nullptr);
-        p.setProperty ("y", shape.points[i].y, nullptr);
-        p.setProperty ("curve", shape.points[i].curve, nullptr);
-        tree.appendChild (p, nullptr);
-    }
-    root.appendChild (tree, undo);
     publishShapes ();
+    if (onShapeChanged)
+        onShapeChanged ();
+}
+void Engine::setRouteAssigned (int source, int target, bool assigned)
+{
+    if (source < 0 || source >= 2 || target < 0 || target >= count)
+        return;
+    const auto onID = routeID (source, target, "ON");
+    const bool currentlyAssigned = state.getRawParameterValue (onID)->load () > .5f;
+    if (currentlyAssigned == assigned)
+        return;
+    beginUndoTransaction ((assigned ? "Assign LFO " : "Remove LFO ") + juce::String (source + 1) + " route");
+    if (assigned)
+    {
+        setRouteParameter (state, routeID (source, target, "DEPTH"), 0);
+        setRouteParameter (state, routeID (source, target, "BYPASS"), 0);
+    }
+    setRouteParameter (state, onID, assigned ? 1.0f : 0.0f);
 }
 void Engine::publishShapes ()
 {
@@ -168,6 +201,7 @@ void Engine::beginBlock (double sampleRate, int, double bpm, double ppq, bool pl
         const double beats = divisionBeats (juce::jlimit (0, 26, (int)p[2]->load ()));
         const double rate = sync ? bpm / (60 * beats) : juce::jlimit (.05f, 20.0f, p[0]->load ());
         increments[s] = rate / sampleRate;
+        displayRateHz[s].store ((float) rate, std::memory_order_relaxed);
         retrigger[s] = p[3]->load () > .5f;
         freeStart[s] =
             sync && playing && hasPPQ && std::isfinite (ppq) ? ppq / beats - std::floor (ppq / beats) : freePhase[s];

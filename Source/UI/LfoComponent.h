@@ -12,24 +12,34 @@ class LfoComponent : public juce::Component
     void refresh ();
 
   private:
-    class Curve : public juce::Component
+    class Curve : public juce::Component, private juce::Timer
     {
       public:
         explicit Curve (LfoComponent &o) : owner (o)
         {
+            setOpaque (true);
             setTooltipText ();
         }
         void paint (juce::Graphics &) override;
         void mouseDown (const juce::MouseEvent &) override;
         void mouseDrag (const juce::MouseEvent &) override;
         void mouseDoubleClick (const juce::MouseEvent &) override;
+        void setPlaybackActive (bool);
+        void resetPlayhead ();
 
       private:
         LfoComponent &owner;
         Modulation::Shape shape;
         int node = -1, segment = -1;
         float initialCurve = 0, initialY = 0;
+        float playheadPhase = 0;
+        double lastFrameMs = 0;
+        uint32_t lastRetriggerCount = 0;
+        bool playbackActive = false;
+        static constexpr float verticalInset = 4.0f;
+        float yForValue (float) const;
         juce::Point<float> normal (const juce::MouseEvent &) const;
+        void timerCallback () override;
         void setTooltipText () {}
     };
     class Handle : public juce::TextButton

@@ -68,6 +68,7 @@ Drag **DRAG LFO 1/2** onto any of the 23 rotary knobs or 16 envelope faders. A n
 
 - Rate: 0.05–20 Hz, or tempo sync from four bars to 1/64 with straight, dotted and triplet divisions (bar labels assume four quarter-note beats).
 - Retrigger: a separate cycle starts with each note and continues through release. With retrigger off, voices share a free-running cycle; synced free mode follows host PPQ while playing. Missing tempo uses 120 BPM, and stopped transport continues on the sample clock.
+- The curve stays visible while idle. Its moving playhead appears only while a voice is sounding, including the release tail, and refreshes at a target 120 Hz while active. Above 3 Hz, a dot on the curve replaces the full-height line to avoid multiple-looking bars.
 - Master gain uses one processor-wide cycle; retrigger resets it on every note-on.
 - Both sources add before destination clamping. Cutoff uses a logarithmic frequency range, pitch uses semitones, and octave/unison count remain discrete. Unison contributions crossfade over 5 ms.
 - Assigned LFOs update attack, decay and release time during each active stage; sustain moves live too. An assigned Glide LFO updates duration throughout an active glide. Glide still requires a previous pitch and either legato playing or ALWAYS, and a zero duration moves immediately to the new note. The filter envelope still adds a linear Hz offset after LFO cutoff modulation.
@@ -85,7 +86,7 @@ Save, load, delete and step through XML presets in:
 
 Projects save the sound settings **and the last known preset name**. Editing the sound retains that name. Restoration uses the project's saved settings without reloading the preset file, so the name can remain visible if the file has been moved or deleted.
 
-The top-right **UNDO** and **REDO** buttons step through parameter, routing and LFO-curve edits. Loading a preset or restoring host state starts a fresh history.
+The top-right **UNDO** and **REDO** buttons step through parameter, routing and LFO-curve edits. Assigning or removing an LFO route is one undo step; loading a preset or restoring host state starts a fresh history. Host automation can also enter the current APVTS undo history.
 
 Older projects without name metadata cannot recover the original name automatically. BlueSynth cannot infer a name from an external host preset that supplies no name metadata. The displayed name identifies the sound's origin; it does not guarantee a match with the preset file.
 
@@ -156,17 +157,23 @@ See [test coverage and limitations](Tests/README.md). Offline passes do not esta
 | File or directory | Responsibility |
 | --- | --- |
 | **[Source/](Source)** | |
-| [PluginProcessor](Source/PluginProcessor.cpp) / [header](Source/PluginProcessor.h) | Parameters, MIDI, voices, project state, master output and meters |
+| [PluginProcessor](Source/PluginProcessor.cpp) / [header](Source/PluginProcessor.h) | MIDI, voices, project state, master output and meters |
 | [PluginEditor](Source/PluginEditor.cpp) / [header](Source/PluginEditor.h) | Layout, parameter attachments and timer |
 | [SynthVoice](Source/SynthVoice.cpp) / [header](Source/SynthVoice.h) | Oscillator banks, tuning, filters, envelopes and note lifecycle |
 | [SynthSound.h](Source/SynthSound.h) | Note/channel eligibility |
 | **[Source/Data/](Source/Data)** | |
+| [Modulation](Source/Data/Modulation.cpp) / [header](Source/Data/Modulation.h) | LFO timing, routing and shapes |
+| [ParameterLayout.cpp](Source/Data/ParameterLayout.cpp) | Ordered host parameter definitions |
+| [WaveformChoices.h](Source/Data/WaveformChoices.h) | Shared waveform menu and saved choice order |
 | [OscData](Source/Data/OscData.cpp) / [header](Source/Data/OscData.h) | Waveforms and FM |
 | [FilterData](Source/Data/FilterData.cpp) / [header](Source/Data/FilterData.h) | TPT filter cascade and coefficient caching |
 | [AdsrData](Source/Data/AdsrData.cpp) / [header](Source/Data/AdsrData.h) | JUCE ADSR parameter wrapper |
 | [PresetManager](Source/Data/PresetManager.cpp) / [header](Source/Data/PresetManager.h) | Preset files, current name and change notification |
 | [VisualizerBuffer](Source/Data/VisualizerBuffer.cpp) / [header](Source/Data/VisualizerBuffer.h) | Accumulation, metering and display FIFO |
 | **[Source/UI/](Source/UI)** | |
+| [LfoComponent](Source/UI/LfoComponent.cpp) / [header](Source/UI/LfoComponent.h) | LFO curve and timing panel |
+| [ModSlider](Source/UI/ModSlider.cpp) / [header](Source/UI/ModSlider.h) | LFO destination controls |
+| [TopControlLookAndFeel](Source/UI/TopControlLookAndFeel.cpp) / [header](Source/UI/TopControlLookAndFeel.h) | Drawing for top-row knobs, buttons and selectors |
 | [OscComponent](Source/UI/OscComponent.cpp) / [header](Source/UI/OscComponent.h) | Oscillator controls |
 | [ADSRComponent](Source/UI/ADSRComponent.cpp) / [header](Source/UI/ADSRComponent.h) | Envelope controls |
 | [FilterComponent](Source/UI/FilterComponent.cpp) / [header](Source/UI/FilterComponent.h) | Filter controls |
@@ -177,7 +184,7 @@ See [test coverage and limitations](Tests/README.md). Offline passes do not esta
 | [PresetComponent](Source/UI/PresetComponent.cpp) / [header](Source/UI/PresetComponent.h) | Preset selector |
 | [AppFont.h](Source/UI/AppFont.h) | Shared UI font helper |
 | **[Tests/](Tests)** | |
-| [RegressionTests.cpp](Tests/RegressionTests.cpp) / [run.sh](Tests/run.sh) | Regression executable and runner |
+| [Tests/](Tests) | Feature-grouped regression sources, shared helpers, and the [runner](Tests/run.sh) |
 | [README.md](Tests/README.md) | Test coverage and limitations |
 | **Other** | |
 | [Architecture guide](docs/architecture.md) | Ownership, signal flow, state and threading |

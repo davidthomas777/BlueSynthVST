@@ -8,7 +8,7 @@ class PresetManager
 public:
     static const juce::String presetFileExtension;
 
-    PresetManager();
+    explicit PresetManager (juce::File directory = {});
     Modulation::Engine* modulation = nullptr;
 
     bool savePreset   (juce::AudioProcessorValueTreeState& apvts, const juce::String& name);
@@ -39,6 +39,7 @@ public:
 private:
     void ensurePresetDirectoryExists() const;
 
+    juce::File presetDirectoryOverride;
     juce::String currentPresetName;
     mutable juce::CriticalSection nameLock;
 
