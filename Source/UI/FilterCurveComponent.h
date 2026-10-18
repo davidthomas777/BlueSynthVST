@@ -34,6 +34,9 @@ public:
     // casing needed to hide the dot when nothing is playing.
     void setLiveCutoff (float liveCutoffHz);
 
+    static float frequencyForProportion (float proportion) noexcept;
+    static float proportionForFrequency (float frequencyHz) noexcept;
+
     void paint (juce::Graphics&) override;
 
 private:

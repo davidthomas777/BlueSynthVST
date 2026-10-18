@@ -1,6 +1,7 @@
 #include "TestSupport.h"
 #include "TestCases.h"
 #include "Data/FilterData.h"
+#include "UI/FilterCurveComponent.h"
 #include <complex>
 #include <iostream>
 
@@ -101,6 +102,12 @@ struct EnvelopeRig
     }
 };
 
+static float expectedEnvelopeCutoff (float base, float envelope, float amount)
+{
+    return base * std::pow ((amount < 0.0f ? 20.0f : 20000.0f) / base,
+                            envelope * std::abs (amount));
+}
+
 void filterEnvelopeStages ()
 {
     for (double rate : { 44100.0, 48000.0, 96000.0 })
@@ -109,13 +116,19 @@ void filterEnvelopeStages ()
             EnvelopeRig rig (rate, block);
             set (rig.processor, "FILTERENVAMT2", -0.1f);
             rig.seconds (0.02, 60);
-            rig.cutoff (7000.0f, 5000.0f, "Incorrect half-attack or inverted amount");
+            rig.cutoff (expectedEnvelopeCutoff (6000.0f, .5f, .1f),
+                        expectedEnvelopeCutoff (6000.0f, .5f, -.1f),
+                        "Incorrect half-attack or inverted amount");
             rig.seconds (0.04);
-            rig.cutoff (7250.0f, 4750.0f, "Incorrect half-decay");
+            rig.cutoff (expectedEnvelopeCutoff (6000.0f, .625f, .1f),
+                        expectedEnvelopeCutoff (6000.0f, .625f, -.1f), "Incorrect half-decay");
             rig.seconds (0.04);
-            rig.cutoff (6500.0f, 5500.0f, "Envelope did not hold sustain");
+            rig.cutoff (expectedEnvelopeCutoff (6000.0f, .25f, .1f),
+                        expectedEnvelopeCutoff (6000.0f, .25f, -.1f), "Envelope did not hold sustain");
             rig.seconds (0.04, 60, false);
-            rig.cutoff (6250.0f, 5750.0f, "Release did not start at the sustain level");
+            rig.cutoff (expectedEnvelopeCutoff (6000.0f, .125f, .1f),
+                        expectedEnvelopeCutoff (6000.0f, .125f, -.1f),
+                        "Release did not start at the sustain level");
             rig.seconds (0.05);
             rig.cutoff (6000.0f, 6000.0f, "Release did not return cutoff to its base");
         }
@@ -123,12 +136,16 @@ void filterEnvelopeStages ()
     EnvelopeRig early;
     early.seconds (0.02, 60);
     early.seconds (0.04, 60, false);
-    early.cutoff (6500.0f, 6500.0f, "Early note-off did not release from the current attack level");
+    early.cutoff (expectedEnvelopeCutoff (6000.0f, .25f, .1f),
+                  expectedEnvelopeCutoff (6000.0f, .25f, .1f),
+                  "Early note-off did not release from the current attack level");
 
     EnvelopeRig independent;
     set (independent.processor, "FILTERENVATTACK2", 0.08f);
     independent.seconds (0.02, 60);
-    independent.cutoff (7000.0f, 6500.0f, "The two oscillators did not use independent filter ADSRs");
+    independent.cutoff (expectedEnvelopeCutoff (6000.0f, .5f, .1f),
+                         expectedEnvelopeCutoff (6000.0f, .25f, .1f),
+                         "The two oscillators did not use independent filter ADSRs");
 
     EnvelopeRig zero;
     set (zero.processor, "FILTERENVAMT", 0.0f);
@@ -138,7 +155,9 @@ void filterEnvelopeStages ()
     set (zero.processor, "FILTERENVAMT", 0.1f);
     set (zero.processor, "FILTERENVAMT2", 0.1f);
     zero.samples (1);
-    zero.cutoff (7000.0f, 7000.0f, "Envelope froze while amount was zero");
+    zero.cutoff (expectedEnvelopeCutoff (6000.0f, .5f, .1f),
+                 expectedEnvelopeCutoff (6000.0f, .5f, .1f),
+                 "Envelope froze while amount was zero");
 
     EnvelopeRig instant;
     for (const auto* suffix : { "", "2" })
@@ -157,16 +176,97 @@ void filterEnvelopeStages ()
     set (limits.processor, "FILTERENVAMT", 1.0f);
     set (limits.processor, "FILTERENVAMT2", -1.0f);
     limits.seconds (0.05, 60);
-    limits.cutoff (20000.0f, 20.0f, "Envelope exceeded the cutoff limits");
+    limits.cutoff (expectedEnvelopeCutoff (19000.0f, .8125f, 1.0f),
+                   expectedEnvelopeCutoff (1000.0f, .8125f, -1.0f),
+                   "Envelope exceeded the cutoff limits");
     set (limits.processor, "FILTERCUTOFF", 6000.0f);
     set (limits.processor, "FILTERCUTOFF2", 6000.0f);
     set (limits.processor, "FILTERENVAMT", 0.1f);
     set (limits.processor, "FILTERENVAMT2", 0.1f);
     limits.samples (1);
     // The base cutoff now ramps for 10ms; envelope progress must remain independent.
-    limits.cutoff (20000.0f, 2635.0f, "Envelope froze at a clamped/bypassed cutoff");
+    require (limits.processor.getFilter1LiveCutoffHz () > 18000.0f &&
+                 limits.processor.getFilter2LiveCutoffHz () > 1000.0f,
+             "Envelope froze after its amount and base cutoff changed");
     limits.seconds (0.01);
-    limits.cutoff (7250.0f, 7250.0f, "Base cutoff smoothing changed the envelope timeline");
+    limits.cutoff (expectedEnvelopeCutoff (6000.0f, .625f, .1f),
+                   expectedEnvelopeCutoff (6000.0f, .625f, .1f),
+                   "Base cutoff smoothing changed the envelope timeline");
+}
+
+void filterEnvelopeDistribution ()
+{
+    for (float frequency : {20.0f, 200.0f, 2000.0f, 20000.0f})
+    {
+        const float expected = std::log10 (frequency / 20.0f) / 3.0f;
+        require (std::abs (FilterCurveComponent::proportionForFrequency (frequency) - expected) < .0001f,
+                 "Filter graph does not space frequency decades evenly");
+        require (std::abs (FilterCurveComponent::frequencyForProportion (expected) - frequency) < frequency * .0001f,
+                 "Filter graph frequency and position mappings disagree");
+    }
+    require (FilterCurveComponent::proportionForFrequency (1.0f) == 0.0f &&
+                 FilterCurveComponent::proportionForFrequency (30000.0f) == 1.0f,
+             "Filter graph did not clamp its visible frequency range");
+
+    for (float base : {500.0f, 1800.0f, 1900.0f, 2000.0f, 2100.0f, 4000.0f, 10000.0f})
+        for (float amount : {-0.57f, -0.09f, 0.09f, 0.57f})
+            for (float savedMode : {0.0f, 1.0f})
+        {
+            EnvelopeRig rig (48000.0, 17);
+            for (const auto *suffix : {"", "2"})
+            {
+                rig.parameter ("FILTERENVMODE", suffix, savedMode);
+                rig.parameter ("FILTERCUTOFF", suffix, base);
+                rig.parameter ("FILTERENVAMT", suffix, amount);
+                rig.parameter ("FILTERENVATTACK", suffix, 0.0f);
+                rig.parameter ("FILTERENVDECAY", suffix, 0.01f);
+                rig.parameter ("FILTERENVSUSTAIN", suffix, 0.0f);
+            }
+            auto check = [&] (float envelopeLevel)
+            {
+                const float expected = expectedEnvelopeCutoff (base, envelopeLevel, amount);
+                // A zero-attack ADSR enters decay on the first rendered sample.
+                if (std::abs (rig.processor.getFilter1LiveCutoffHz () - expected) >= 35.0f ||
+                    std::abs (rig.processor.getFilter2LiveCutoffHz () - expected) >= 35.0f)
+                {
+                    std::cerr << "Base " << base << ", amount " << amount << ", saved mode " << savedMode
+                              << ", envelope " << envelopeLevel << ", expected " << expected
+                              << ", got " << rig.processor.getFilter1LiveCutoffHz () << "/"
+                              << rig.processor.getFilter2LiveCutoffHz () << '\n';
+                    throw std::runtime_error ("Fast filter envelope cutoff used the wrong range mapping");
+                }
+                const float position = FilterCurveComponent::proportionForFrequency (
+                    rig.processor.getFilter1LiveCutoffHz ());
+                require (std::abs (position - FilterCurveComponent::proportionForFrequency (expected)) < .035f,
+                         "Displayed filter position differs from the rendered cutoff");
+                const float start = FilterCurveComponent::proportionForFrequency (base);
+                const float end = amount < 0.0f ? 0.0f : 1.0f;
+                const float expectedPosition = start + envelopeLevel * std::abs (amount) * (end - start);
+                require (std::abs (position - expectedPosition) < .035f,
+                         "Filter envelope did not travel evenly across the graph");
+            };
+            rig.samples (1, 60);
+            check (1.0f);
+            rig.samples (239);
+            check (.5f);
+            rig.samples (240);
+            check (0.0f);
+        }
+
+    EnvelopeRig threshold (48000.0, 17);
+    for (const auto *suffix : {"", "2"})
+    {
+        threshold.parameter ("FILTERENVMODE", suffix, 0.0f);
+        threshold.parameter ("FILTERCUTOFF", suffix, 1800.0f);
+        threshold.parameter ("FILTERENVAMT", suffix, -.09f);
+        threshold.parameter ("FILTERENVATTACK", suffix, 0.0f);
+        threshold.parameter ("FILTERENVDECAY", suffix, .01f);
+        threshold.parameter ("FILTERENVSUSTAIN", suffix, 0.0f);
+    }
+    threshold.samples (1, 60);
+    require (threshold.processor.getFilter1LiveCutoffHz () > 1100.0f &&
+                 threshold.processor.getFilter2LiveCutoffHz () > 1100.0f,
+             "Legacy preset mode still collapsed a 1.8 kHz cutoff to the floor");
 }
 
 void filterEnvelopeMute ()
@@ -178,12 +278,16 @@ void filterEnvelopeMute ()
         rig.seconds (0.02, 60);
         set (rig.processor, enabled, 1.0f);
         rig.samples (1);
-        rig.cutoff (7000.0f, 7000.0f, "Muting an oscillator froze its filter attack");
+        rig.cutoff (expectedEnvelopeCutoff (6000.0f, .5f, .1f),
+                    expectedEnvelopeCutoff (6000.0f, .5f, .1f),
+                    "Muting an oscillator froze its filter attack");
         set (rig.processor, enabled, 0.0f);
         rig.seconds (0.04, 60, false);
         set (rig.processor, enabled, 1.0f);
         rig.samples (1);
-        rig.cutoff (6500.0f, 6500.0f, "Muting an oscillator froze its filter release");
+        rig.cutoff (expectedEnvelopeCutoff (6000.0f, .25f, .1f),
+                    expectedEnvelopeCutoff (6000.0f, .25f, .1f),
+                    "Muting an oscillator froze its filter release");
     }
 }
 
@@ -211,7 +315,9 @@ void filterEnvelopeReuse ()
             rig.samples (128, 60, false);
         }
         rig.seconds (0.02, 62);
-        rig.cutoff (7000.0f, 7000.0f, "Reused voice inherited the previous note's filter envelope");
+        rig.cutoff (expectedEnvelopeCutoff (6000.0f, .5f, .1f),
+                    expectedEnvelopeCutoff (6000.0f, .5f, .1f),
+                    "Reused voice inherited the previous note's filter envelope");
     }
 }
 
@@ -222,7 +328,9 @@ void filterEnvelopeSampleRate ()
     rig.processor.prepareToPlay (96000.0, rig.blockSize);
     rig.rate = 96000.0;
     rig.seconds (0.02, 62);
-    rig.cutoff (7000.0f, 7000.0f, "Sample-rate change altered envelope timing with unchanged parameters");
+    rig.cutoff (expectedEnvelopeCutoff (6000.0f, .5f, .1f),
+                expectedEnvelopeCutoff (6000.0f, .5f, .1f),
+                "Sample-rate change altered envelope timing with unchanged parameters");
 }
 
 static std::vector<float> envelopeAudio (int blockSize, bool zeroAmount, bool alternateEnvelope)
@@ -379,4 +487,3 @@ void automationConsistency ()
             }
         }
 }
-

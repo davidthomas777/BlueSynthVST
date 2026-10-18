@@ -110,5 +110,11 @@ juce::AudioProcessorValueTreeState::ParameterLayout BlueSynthAudioProcessor::cre
     // Off: glide only between overlapping (legato) notes. On: glide into every note.
     params.push_back (std::make_unique<juce::AudioParameterBool> (juce::ParameterID { "GLIDEALWAYS", 1 }, "Glide Always", false));
     Modulation::Engine::addParameters (params);
+    // Keep the two saved choice IDs and indices for host compatibility. Rendering now
+    // uses the relative mapping for either value; these are no longer editor controls.
+    params.push_back (std::make_unique<juce::AudioParameterChoice> (
+        juce::ParameterID { "FILTERENVMODE", 1 }, "Filter 1 Envelope Range", juce::StringArray { "Legacy (unused)", "Relative" }, 1));
+    params.push_back (std::make_unique<juce::AudioParameterChoice> (
+        juce::ParameterID { "FILTERENVMODE2", 1 }, "Filter 2 Envelope Range", juce::StringArray { "Legacy (unused)", "Relative" }, 1));
     return { params.begin(), params.end() };
 }

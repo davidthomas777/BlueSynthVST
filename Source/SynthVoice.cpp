@@ -22,6 +22,17 @@ SynthVoice::~SynthVoice()
 // at 44.1kHz where the TPT topology is badly frequency-warped. So a wide-open low-pass
 // is skipped outright rather than run — see filterIsBypassed().
 static constexpr float kFilterCutoffMax = 20000.0f;
+static constexpr float kFilterCutoffMin = 20.0f;
+
+static inline float envelopeCutoff (float base, float envelope, float amount)
+{
+    base = juce::jlimit (kFilterCutoffMin, kFilterCutoffMax, base);
+    if (amount == 0.0f || envelope == 0.0f)
+        return base;
+    const float limit = amount < 0.0f ? kFilterCutoffMin : kFilterCutoffMax;
+    return juce::jlimit (kFilterCutoffMin, kFilterCutoffMax,
+                         base * std::pow (limit / base, envelope * std::abs (amount)));
+}
 
 // Only a *low-pass* is transparent when opened all the way; a high-pass or band-pass
 // parked at 20kHz is doing very real work and must stay in the path.
@@ -476,7 +487,8 @@ void SynthVoice::renderCore (juce::AudioBuffer<float>& outputBuffer, int startSa
         for (int s = 0; s < synthBuffer.getNumSamples(); ++s)
         {
             float env    = filterAdsr.getNextSample();
-            float cutoff = juce::jlimit (20.0f, kFilterCutoffMax, modulated(Modulation::cutoff1,cutoffSmooth.getNextValue()) + env * modulated(Modulation::envAmount1,filterEnvAmt) * kFilterCutoffMax);
+            float cutoff = envelopeCutoff (modulated(Modulation::cutoff1,cutoffSmooth.getNextValue()), env,
+                                           modulated(Modulation::envAmount1,filterEnvAmt));
             const float resonance = modulated(Modulation::resonance1,resonanceSmooth.getNextValue());
             finalCutoff  = cutoff;
             finalResonance = resonance;
@@ -526,7 +538,7 @@ void SynthVoice::renderCore (juce::AudioBuffer<float>& outputBuffer, int startSa
         if (numSamples > 0 && isDisplayVoice())
         {
             sharedState.lastFilter1Cutoff.store (
-                juce::jlimit (20.0f, kFilterCutoffMax, cutoffSmooth.getCurrentValue() + env * filterEnvAmt * kFilterCutoffMax),
+                envelopeCutoff (cutoffSmooth.getCurrentValue(), env, filterEnvAmt),
                 std::memory_order_relaxed);
             sharedState.lastFilter1Res.store (resonanceSmooth.getCurrentValue(), std::memory_order_relaxed);
         }
@@ -555,7 +567,8 @@ void SynthVoice::renderCore (juce::AudioBuffer<float>& outputBuffer, int startSa
         for (int s = 0; s < osc2Buffer.getNumSamples(); ++s)
         {
             float env    = filterAdsr2.getNextSample();
-            float cutoff = juce::jlimit (20.0f, kFilterCutoffMax, modulated(Modulation::cutoff2,cutoffSmooth2.getNextValue()) + env * modulated(Modulation::envAmount2,filterEnvAmt2) * kFilterCutoffMax);
+            float cutoff = envelopeCutoff (modulated(Modulation::cutoff2,cutoffSmooth2.getNextValue()), env,
+                                           modulated(Modulation::envAmount2,filterEnvAmt2));
             const float resonance = modulated(Modulation::resonance2,resonanceSmooth2.getNextValue());
             finalCutoff2 = cutoff;
             finalResonance2 = resonance;
@@ -607,7 +620,7 @@ void SynthVoice::renderCore (juce::AudioBuffer<float>& outputBuffer, int startSa
         if (numSamples > 0 && isDisplayVoice())
         {
             sharedState.lastFilter2Cutoff.store (
-                juce::jlimit (20.0f, kFilterCutoffMax, cutoffSmooth2.getCurrentValue() + env * filterEnvAmt2 * kFilterCutoffMax),
+                envelopeCutoff (cutoffSmooth2.getCurrentValue(), env, filterEnvAmt2),
                 std::memory_order_relaxed);
             sharedState.lastFilter2Res.store (resonanceSmooth2.getCurrentValue(), std::memory_order_relaxed);
         }

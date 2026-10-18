@@ -14,6 +14,7 @@ Coverage:
 - Independent cutoff displays and first-note glide for multiple plugin instances; concurrent rendering and destruction of a separate instance.
 - Preset selector/timer ordering, host dirty notification, names absent from the preset directory, parameter edits, and restoration into a new processor/editor.
 - Legacy name/slope defaults, malformed data, and unrelated XML roots.
+- Fast 10 ms filter-envelope sweeps at low and high base cutoffs with positive and negative amounts and both retained mode indices, checking rendered filter cutoffs and uniform logarithmic graph travel at peak, midpoint and end. State tests verify the retained indices survive restoration while rendering uses the same mapping.
 - Filter centre-frequency gain, stereo isolation, and finite output for every type/slope at four sample rates; rapid type/slope/cutoff changes.
 - MIDI note-off, release completion, the host's tail-length declaration, and idle cutoff updates after release.
 - Filter ADSR attack/decay/sustain/release timing at 44.1/48/96 kHz and block sizes 1/17/128/512; positive/negative/zero amount, early note-off, zero-time stages, independent envelopes, and the 20 Hz/20 kHz limits.

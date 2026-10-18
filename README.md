@@ -43,7 +43,9 @@ Each oscillator has a filter, amplitude ADSR and filter ADSR. FILTER 1/2 tabs se
 - Low-pass at 20 kHz is bypassed. Positive modulation at that ceiling cannot raise it further.
 - Filter release does not extend a note beyond its amplitude release.
 
-Amount applies a **linear Hz offset**: `base cutoff + envelope × amount × 20000`, clamped to the cutoff range. A 1 kHz base with amount +0.1 reaches 3 kHz at the envelope peak. Amount has a zero snap region below an absolute value of 0.05.
+The filter envelope amount moves by that fraction of the remaining distance on the logarithmic frequency graph, toward 20 Hz for negative amounts or 20 kHz for positive amounts. For example, a −0.57 amount moves a 2.4 kHz base to about 157 Hz at the envelope peak, 57% of the way to the graph's left edge. The dot reaches the edge only at full negative amount. Older presets and projects now use this mapping too, so their filter sweeps can sound different. Amount has a zero snap region below an absolute value of 0.05.
+
+The response graph uses a logarithmic 20 Hz–20 kHz x-axis, so equal ratios occupy equal widths. Its 60 Hz display can skip intermediate positions during a 10 ms decay; the audio filter still follows the envelope each sample.
 
 Steeper slopes use more stages and CPU. The default reproduces the original two-pole response; older presets without slope settings restore that default. See [filter implementation](docs/architecture.md#filters-and-envelopes) for stage and resonance details.
 
@@ -58,7 +60,7 @@ Steeper slopes use more stages and CPU. The default reproduces the original two-
 
 Velocity-sensitive gain, pitch-wheel modulation, custom MIDI CC mappings and MPE are not implemented. JUCE handles standard note/pedal behavior, but pedal edge cases are not yet covered by the regression suite.
 
-Master/oscillator gain and base filter cutoff/resonance changes use 10 ms ramps. Carrier pitch changes use 50 ms smoothing with or without FM; new notes start at their assigned pitch. Filter-envelope timing and its linear-Hz amount mapping are unchanged. Waveform, filter-type/slope, oscillator-enable and FM-depth switches are not crossfaded by this smoothing pass.
+Master/oscillator gain and base filter cutoff/resonance changes use 10 ms ramps. Carrier pitch changes use 50 ms smoothing with or without FM; new notes start at their assigned pitch. Filter-envelope timing is unchanged. Waveform, filter-type/slope, oscillator-enable and FM-depth switches are not crossfaded by this smoothing pass.
 
 ### LFO modulation
 
@@ -71,7 +73,7 @@ Drag **DRAG LFO 1/2** onto any of the 23 rotary knobs or 16 envelope faders. A n
 - The curve stays visible while idle. Its moving playhead appears only while a voice is sounding, including the release tail, and refreshes at a target 120 Hz while active. Above 3 Hz, a dot on the curve replaces the full-height line to avoid multiple-looking bars.
 - Master gain uses one processor-wide cycle; retrigger resets it on every note-on.
 - Both sources add before destination clamping. Cutoff uses a logarithmic frequency range, pitch uses semitones, and octave/unison count remain discrete. Unison contributions crossfade over 5 ms.
-- Assigned LFOs update attack, decay and release time during each active stage; sustain moves live too. An assigned Glide LFO updates duration throughout an active glide. Glide still requires a previous pitch and either legato playing or ALWAYS, and a zero duration moves immediately to the new note. The filter envelope still adds a linear Hz offset after LFO cutoff modulation.
+- Assigned LFOs update attack, decay and release time during each active stage; sustain moves live too. An assigned Glide LFO updates duration throughout an active glide. Glide still requires a previous pitch and either legato playing or ALWAYS, and a zero duration moves immediately to the new note. The filter envelope moves the LFO-modulated base cutoff across the logarithmic frequency range.
 - Curves, timing and routes are saved in presets and host state. Older states clear LFO assignments and restore the default sine/1 Hz/retrigger settings.
 
 LFO rendering adds CPU work, especially with high polyphony, unison and moving filter coefficients. The regression runner prints an offline comparison; it does not measure a DAW's CPU meter or guarantee a host buffer deadline.
@@ -148,7 +150,7 @@ After adding, removing or renaming source files, update the .jucer project and r
 bash Tests/run.sh
 ```
 
-The runner builds Shared Code and executes **27 regression groups** for FM output, instance isolation, preset state, filters, MIDI releases, envelopes, voice-reuse pitch, glide compatibility, smoothing, undo/redo and LFO routing/timing/state/UI. It also prints an offline dense-polyphony timing comparison. It does not install plugins or modify preset files. Processor construction may create the preset directory if absent.
+The runner builds Shared Code and executes **28 regression groups** for FM output, instance isolation, preset state, filters, MIDI releases, envelopes, voice-reuse pitch, glide compatibility, smoothing, undo/redo and LFO routing/timing/state/UI. It also prints an offline dense-polyphony timing comparison. It does not install plugins or modify preset files. Processor construction may create the preset directory if absent.
 
 See [test coverage and limitations](Tests/README.md). Offline passes do not establish FL Studio project compatibility, perceived sound quality or a CPU ceiling.
 

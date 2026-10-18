@@ -59,6 +59,9 @@ static juce::ComboBox& presetBox (PresetComponent& component)
 void presetState ()
 {
     BlueSynthAudioProcessor source;
+    require (source.apvts.getRawParameterValue ("FILTERENVMODE")->load () == 1.0f &&
+                 source.apvts.getRawParameterValue ("FILTERENVMODE2")->load () == 1.0f,
+             "Retained envelope mode parameters changed their saved defaults");
     PresetComponent ui (source.apvts, source.presetManager);
     auto& box = presetBox (ui);
     // Exercise the selection/timer ordering without reading or writing a user's presets.
@@ -85,16 +88,22 @@ void presetState ()
              "Restoring the preset name overwrote sound edits");
     require (restored.apvts.getRawParameterValue ("FILTERSLOPE")->load() == 3.0f,
              "Slope did not survive state restoration");
+    require (restored.apvts.getRawParameterValue ("FILTERENVMODE")->load () == 1.0f &&
+                 restored.apvts.getRawParameterValue ("FILTERENVMODE2")->load () == 1.0f,
+             "Retained envelope mode parameters did not survive state restoration");
 
     auto legacy = source.apvts.copyState();
     legacy.removeProperty ("presetName", nullptr);
-    for (const char* id : { "FILTERSLOPE", "FILTERSLOPE2" })
+    for (const char* id : { "FILTERSLOPE", "FILTERSLOPE2", "FILTERENVMODE", "FILTERENVMODE2" })
         legacy.removeChild (legacy.getChildWithProperty ("id", id), nullptr);
     juce::AudioProcessor::copyXmlToBinary (*legacy.createXml(), saved);
     restored.setStateInformation (saved.getData(), (int) saved.getSize());
     require (restored.presetManager.getCurrentPresetName().isEmpty(), "Legacy state inherited a stale name");
     require (restored.apvts.getRawParameterValue ("FILTERSLOPE")->load() == 0.0f,
              "Legacy state inherited a steep slope");
+    require (restored.apvts.getRawParameterValue ("FILTERENVMODE")->load () == 0.0f &&
+                 restored.apvts.getRawParameterValue ("FILTERENVMODE2")->load () == 0.0f,
+             "Legacy state did not restore retained envelope mode indices");
     juce::XmlElement invalid ("UnrelatedDocument");
     juce::AudioProcessor::copyXmlToBinary (invalid, saved);
     restored.setStateInformation (saved.getData(), (int) saved.getSize());
@@ -122,6 +131,19 @@ void presetState ()
     require (!presetProcessor.undoManager.canUndo (), "Preset fallback left stale undo history");
     require (std::abs (presetProcessor.apvts.getRawParameterValue ("FILTERCUTOFF")->load () - 20000) < 1,
              "Preset fallback did not restore cutoff");
+
+    auto legacyPreset = presetProcessor.apvts.copyState ();
+    for (const auto *id : {"FILTERENVMODE", "FILTERENVMODE2"})
+        legacyPreset.removeChild (legacyPreset.getChildWithProperty ("id", id), nullptr);
+    auto legacyXml = legacyPreset.createXml ();
+    require (legacyXml != nullptr &&
+                 legacyXml->writeTo (filePresets.getPresetDirectory ().getChildFile ("Legacy mapping.xml")),
+             "Could not create isolated legacy preset");
+    require (filePresets.loadPreset (presetProcessor.apvts, "Legacy mapping"),
+             "Could not load isolated legacy preset");
+    require (presetProcessor.apvts.getRawParameterValue ("FILTERENVMODE")->load () == 0.0f &&
+                 presetProcessor.apvts.getRawParameterValue ("FILTERENVMODE2")->load () == 0.0f,
+             "Legacy preset did not restore retained envelope mode indices");
 
     filePresets.modulation = &presetProcessor.modulation;
     presetAttachment.beginGesture ();

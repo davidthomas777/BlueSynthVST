@@ -174,7 +174,7 @@ The default uses one stage and preserves the original response. New slope parame
 
 The filter envelope is evaluated per sample. Its amount is added to the base cutoff and clamped to 20 Hz–20 kHz. A low-pass filter at 20 kHz is bypassed because the TPT filter can ring at that setting; high-pass and band-pass filters remain active at 20 kHz.
 
-The mapping is `cutoff = clamp(baseCutoff + envelope * amount * 20000, 20, 20000)` in Hz. Positive amount raises cutoff; negative amount lowers it; zero amount leaves the audio unaffected by the filter ADSR. A positive sweep at a base cutoff of 20 kHz is pinned to the ceiling. This is a linear Hz offset, not an octave-based modulation scale.
+The mapping is `cutoff = baseCutoff × (limit / baseCutoff) ^ (envelope × abs(amount))`, where `limit` is 20 Hz for a negative amount and 20 kHz for a positive one. Positive amount raises cutoff; negative amount lowers it; zero amount leaves the audio unaffected by the filter ADSR. This makes the cutoff move evenly across the logarithmic graph. Existing presets and projects use this mapping even if they saved the earlier linear-Hz mode, so their filter sweeps can sound different.
 
 All four envelopes restart from zero for a newly assigned note. Filter envelopes keep advancing while their oscillator is disabled, just as the amplitude envelopes do. During preparation their rates are recalculated for the current sample rate even if the parameter values have not changed. The amplitude envelopes determine when a voice finishes, so a long filter release does not extend the audible note beyond its amplitude release.
 
@@ -202,7 +202,7 @@ The processor owns a `SynthVoice::SharedState` that outlives its voices. It hold
 
 `OscilloscopeComponent` keeps a short ring of audio samples, chooses a window based on the selected voice's frequency, searches for a rising zero crossing, and min/max decimates samples into screen columns. The editor applies visual-only tanh shaping before pushing data into the scope. This shaping does not alter the plugin's audio output.
 
-`FilterCurveComponent` calculates the response from filter type, cutoff, resonance, and sample rate. The editor polls the live cutoff and resonance at 60 Hz. When no voice is active, the processor publishes both base knob values, so idle edits update the curve immediately. The graph spans the full 20 Hz–20 kHz parameter range on a logarithmic x-axis.
+`FilterCurveComponent` calculates the response from filter type, cutoff, resonance, and sample rate. The editor polls the live cutoff and resonance at 60 Hz. When no voice is active, the processor publishes both base knob values, so idle edits update the curve immediately. The graph spans the full 20 Hz–20 kHz parameter range on a logarithmic x-axis. An envelope amount of magnitude 1 reaches the relevant limit at the envelope peak; smaller amounts move the same fraction of the remaining graph distance at any base cutoff. The retained `FILTERENVMODE` choice parameters preserve saved IDs and indices, but either value now uses this mapping and the editor no longer presents a mode selector. The graph uses the rendered cutoff.
 
 ## Editor and controls
 

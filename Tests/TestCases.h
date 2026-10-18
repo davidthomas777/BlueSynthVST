@@ -6,6 +6,7 @@ void presetState();
 void filters();
 void releaseTail();
 void filterEnvelopeStages();
+void filterEnvelopeDistribution();
 void filterEnvelopeMute();
 void filterEnvelopeReuse();
 void filterEnvelopeSampleRate();

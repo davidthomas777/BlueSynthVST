@@ -14,6 +14,7 @@ int main()
                              std::make_pair ("Filter types, slopes and sample rates", filters),
                              std::make_pair ("MIDI release and idle visualizer", releaseTail),
                              std::make_pair ("Filter ADSR stages, amount and cutoff limits", filterEnvelopeStages),
+                             std::make_pair ("Fast filter-envelope cutoff distribution", filterEnvelopeDistribution),
                              std::make_pair ("Filter ADSR while oscillators are muted", filterEnvelopeMute),
                              std::make_pair ("Filter ADSR on voice reuse and hard stop", filterEnvelopeReuse),
                              std::make_pair ("Filter ADSR after sample-rate changes", filterEnvelopeSampleRate),

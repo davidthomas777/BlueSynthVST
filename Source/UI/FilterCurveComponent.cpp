@@ -39,6 +39,17 @@ void FilterCurveComponent::setLiveCutoff (float liveCutoffHz)
     repaint();
 }
 
+float FilterCurveComponent::frequencyForProportion (float proportion) noexcept
+{
+    return kMinFreq * std::pow (kMaxFreq / kMinFreq, juce::jlimit (0.0f, 1.0f, proportion));
+}
+
+float FilterCurveComponent::proportionForFrequency (float frequencyHz) noexcept
+{
+    return std::log (juce::jlimit (kMinFreq, kMaxFreq, frequencyHz) / kMinFreq) /
+           std::log (kMaxFreq / kMinFreq);
+}
+
 float FilterCurveComponent::magnitudeAt (int filterType, float freq, float cutoffHz, float resonance, double sr, int slope)
 {
     sr = sr > 0.0 ? sr : 44100.0;
@@ -103,15 +114,12 @@ void FilterCurveComponent::paint (juce::Graphics& g)
     // SynthVoice.cpp), so the honest picture is a flat 0dB line, not a phantom rolloff.
     const bool bypassed = (type == 0 && drawCutoff >= kMaxFreq);
 
-    const float logMin = std::log (kMinFreq);
-    const float logMax = std::log (kMaxFreq);
-
     juce::Path curve;
     curve.preallocateSpace (3 * width + 8);
 
     for (int x = 0; x < width; ++x)
     {
-        const float freq = std::exp (logMin + (logMax - logMin) * (float) x / (float) (width - 1));
+        const float freq = frequencyForProportion ((float) x / (float) (width - 1));
         const float db   = bypassed ? 0.0f
                                     : juce::Decibels::gainToDecibels (
                                           magnitudeAt (type, freq, drawCutoff, res, sampleRate, slope), kMinDb);
@@ -142,7 +150,7 @@ void FilterCurveComponent::paint (juce::Graphics& g)
                                    : juce::Decibels::gainToDecibels (
                                          magnitudeAt (type, dotFreq, drawCutoff, res, sampleRate, slope), kMinDb);
 
-    const float dotX = bounds.getX() + (std::log (dotFreq) - logMin) / (logMax - logMin) * (float) (width - 1);
+    const float dotX = bounds.getX() + proportionForFrequency (dotFreq) * (float) (width - 1);
     const float dotY = juce::jmap (juce::jlimit (kMinDb, kMaxDb, dotDb),
                                    kMaxDb, kMinDb, bounds.getY(), bounds.getBottom());
 

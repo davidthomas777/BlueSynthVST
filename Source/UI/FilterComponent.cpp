@@ -62,7 +62,8 @@ void FilterComponent::paint (juce::Graphics& g)
     g.setColour (juce::Colours::white);
     g.drawRect (getLocalBounds(), 1);
     g.setFont (appFont (12.0f));
-    g.drawText ("FILTER TYPE / SLOPE", getLocalBounds().reduced (6).withHeight (14), juce::Justification::centredLeft);
+    g.drawText ("FILTER TYPE / SLOPE", getLocalBounds().reduced (6).withHeight (14),
+                juce::Justification::centredLeft);
 }
 
 void FilterComponent::resized()

@@ -35,7 +35,7 @@ public:
     void setOsc1Enabled  (bool enabled);
     void setOsc1Gain     (float g);
     void update          (float attack, float decay, float sustain, float release);
-    void updateFilter    (float cutoff, float resonance, float envAmt, int type, int slope = 0);
+    void updateFilter    (float cutoff, float resonance, float envAmt, int type, int slope);
     void updateFilterEnv (float attack, float decay, float sustain, float release);
     void setOscWaveType  (int choice);
     void setOscFmParams  (float depth, float freq);
@@ -88,7 +88,7 @@ public:
     void setOsc2FmParams  (float depth, float freq);
     void updateUnison2    (int numVoices, float detune);
     void update2          (float attack, float decay, float sustain, float release);
-    void updateFilter2    (float cutoff, float resonance, float envAmt, int type, int slope = 0);
+    void updateFilter2    (float cutoff, float resonance, float envAmt, int type, int slope);
     void updateFilterEnv2 (float attack, float decay, float sustain, float release);
     void updateOctave2    (int octaves);
     void updateOscPitch2  (float semitones);

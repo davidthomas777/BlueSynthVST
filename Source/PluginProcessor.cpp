@@ -217,8 +217,7 @@ void BlueSynthAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
             voice->updatePortamento (portamento, glideAlways);
             voice->updatePitch      (pitch);
             if (adsrChanged) voice->update (attack, decay, sustain, release);
-            voice->updateFilter     (filterCutoff, filterRes, filterEnvAmt, filterType,
-                                     filterSlope);
+            voice->updateFilter     (filterCutoff, filterRes, filterEnvAmt, filterType, filterSlope);
             if (filterEnvChanged) voice->updateFilterEnv (fEnvAtk, fEnvDec, fEnvSus, fEnvRel);
 
             // --- Osc 2 ---
@@ -230,8 +229,7 @@ void BlueSynthAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
             voice->setOsc2FmParams  (fmDepth2, fmFreq2);
             voice->updateUnison2    (unisonVoices2, unisonDetune2);
             if (adsr2Changed) voice->update2 (attack2, decay2, sustain2, release2);
-            voice->updateFilter2    (filterCutoff2, filterRes2, filterEnvAmt2, filterType2,
-                                     filterSlope2);
+            voice->updateFilter2    (filterCutoff2, filterRes2, filterEnvAmt2, filterType2, filterSlope2);
             if (filterEnv2Changed) voice->updateFilterEnv2 (fEnvAtk2, fEnvDec2, fEnvSus2, fEnvRel2);
         }
     }
@@ -360,7 +358,7 @@ void BlueSynthAudioProcessor::setStateInformation (const void* data, int sizeInB
         auto state = juce::ValueTree::fromXml (*xml);
         if (state.hasType (apvts.state.getType()))
         {
-            for (const auto* id : { "FILTERSLOPE", "FILTERSLOPE2", "GLIDEALWAYS" })
+            for (const auto* id : { "FILTERSLOPE", "FILTERSLOPE2", "GLIDEALWAYS", "FILTERENVMODE", "FILTERENVMODE2" })
             {
                 if (! state.getChildWithProperty ("id", id).isValid())
                 {
