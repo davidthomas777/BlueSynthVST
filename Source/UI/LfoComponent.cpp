@@ -213,17 +213,8 @@ void LfoComponent::Curve::paint (juce::Graphics &g)
     if (playbackActive)
     {
         const float x = playheadPhase * getWidth ();
-        if (owner.engine.displayRateHz[owner.source].load (std::memory_order_relaxed) > 3.0f)
-        {
-            const float y = yForValue (s.evaluate (playheadPhase));
-            g.setColour (juce::Colours::white);
-            g.fillEllipse (x - 4.0f, y - 4.0f, 8.0f, 8.0f);
-        }
-        else
-        {
-            g.setColour (juce::Colours::white.withAlpha (.6f));
-            g.drawLine (x, 0.0f, x, (float) getHeight (), 1.0f);
-        }
+        g.setColour (juce::Colours::white.withAlpha (.6f));
+        g.drawLine (x, 0.0f, x, (float) getHeight (), 1.0f);
     }
 }
 void LfoComponent::Curve::mouseDown (const juce::MouseEvent &e)

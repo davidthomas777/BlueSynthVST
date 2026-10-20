@@ -70,7 +70,7 @@ Drag **DRAG LFO 1/2** onto any of the 23 rotary knobs or 16 envelope faders. A n
 
 - Rate: 0.05–20 Hz, or tempo sync from four bars to 1/64 with straight, dotted and triplet divisions (bar labels assume four quarter-note beats).
 - Retrigger: a separate cycle starts with each note and continues through release. With retrigger off, voices share a free-running cycle; synced free mode follows host PPQ while playing. Missing tempo uses 120 BPM, and stopped transport continues on the sample clock.
-- The curve stays visible while idle. Its moving playhead appears only while a voice is sounding, including the release tail, and refreshes at a target 120 Hz while active. Above 3 Hz, a dot on the curve replaces the full-height line to avoid multiple-looking bars.
+- The curve stays visible while idle. Its moving playhead is always a full-height line while a voice is sounding, including the release tail, and refreshes at a target 120 Hz while active.
 - Master gain uses one processor-wide cycle; retrigger resets it on every note-on.
 - Both sources add before destination clamping. Cutoff uses a logarithmic frequency range, pitch uses semitones, and octave/unison count remain discrete. Unison contributions crossfade over 5 ms.
 - Assigned LFOs update attack, decay and release time during each active stage; sustain moves live too. An assigned Glide LFO updates duration throughout an active glide. Glide still requires a previous pitch and either legato playing or ALWAYS, and a zero duration moves immediately to the new note. The filter envelope moves the LFO-modulated base cutoff across the logarithmic frequency range.

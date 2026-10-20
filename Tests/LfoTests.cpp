@@ -402,12 +402,12 @@ void lfoDisplayLifetime ()
     e.displayRateHz[0].store (5.0f);
     panel.refresh ();
     const auto fastCurve = panel.createComponentSnapshot (panel.getLocalBounds ());
-    int fastMarkerPixels = 0;
+    int fastPlayheadPixels = 0;
     for (int y = 0; y < idleCurve.getHeight (); ++y)
         for (int x = 0; x < idleCurve.getWidth (); ++x)
-            fastMarkerPixels += idleCurve.getPixelAt (x, y) != fastCurve.getPixelAt (x, y);
-    require (fastMarkerPixels > 0 && fastMarkerPixels < playheadPixels / 3,
-             "Fast LFO still painted a full-height playhead");
+            fastPlayheadPixels += idleCurve.getPixelAt (x, y) != fastCurve.getPixelAt (x, y);
+    require (fastPlayheadPixels == playheadPixels,
+             "Fast LFO changed the full-height playhead");
     e.noteSounding.store (false);
     panel.refresh ();
     const auto stoppedCurve = panel.createComponentSnapshot (panel.getLocalBounds ());
