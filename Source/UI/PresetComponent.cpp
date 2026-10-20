@@ -39,7 +39,7 @@ void PresetComponent::PresetBoxLookAndFeel::drawButtonBackground (
     g.setColour (colour);
     g.fillRect (button.getLocalBounds());
 
-    g.setColour (juce::Colours::white);
+    g.setColour (BlueTheme::forComponent (button).border);
     g.drawRect (button.getLocalBounds(), 1);
 }
 
@@ -102,12 +102,12 @@ PresetComponent::PresetComponent (juce::AudioProcessorValueTreeState& a, PresetM
     addAndMakeVisible (presetBox);
 
     // Style buttons: blue background (matches plugin bg), white text only, no visible border
-    auto styleBtn = [] (juce::TextButton& b)
+    auto styleBtn = [this] (juce::TextButton& b)
     {
-        b.setColour (juce::TextButton::buttonColourId,   juce::Colour (0xff4A90E2));
-        b.setColour (juce::TextButton::buttonOnColourId, juce::Colour (0xff3A80D2));
-        b.setColour (juce::TextButton::textColourOffId,  juce::Colours::white);
-        b.setColour (juce::TextButton::textColourOnId,   juce::Colours::white);
+        b.setColour (juce::TextButton::buttonColourId,   BlueTheme::forComponent (*this).control);
+        b.setColour (juce::TextButton::buttonOnColourId, BlueTheme::forComponent (*this).accent);
+        b.setColour (juce::TextButton::textColourOffId,  BlueTheme::forComponent (*this).text);
+        b.setColour (juce::TextButton::textColourOnId,   BlueTheme::forComponent (*this).text);
     };
     styleBtn (prevButton);
     styleBtn (nextButton);
@@ -119,10 +119,10 @@ PresetComponent::PresetComponent (juce::AudioProcessorValueTreeState& a, PresetM
     setLookAndFeel (&presetLookAndFeel);
     presetBox.addListener (this);
     presetBox.setTextWhenNothingSelected ("-- No Preset --");
-    presetBox.setColour (juce::ComboBox::textColourId,       juce::Colours::white);
-    presetBox.setColour (juce::ComboBox::backgroundColourId, juce::Colour (0xff4A90E2));
-    presetBox.setColour (juce::ComboBox::outlineColourId,    juce::Colours::white);
-    presetBox.setColour (juce::ComboBox::arrowColourId,      juce::Colours::white);
+    presetBox.setColour (juce::ComboBox::textColourId,       BlueTheme::forComponent (*this).text);
+    presetBox.setColour (juce::ComboBox::backgroundColourId, BlueTheme::forComponent (*this).control);
+    presetBox.setColour (juce::ComboBox::outlineColourId,    BlueTheme::forComponent (*this).border);
+    presetBox.setColour (juce::ComboBox::arrowColourId,      BlueTheme::forComponent (*this).accent);
     refreshPresetList();
 
     refreshCurrentPresetName();
@@ -219,9 +219,9 @@ PresetComponent::~PresetComponent()
 
 void PresetComponent::paint (juce::Graphics& g)
 {
-    g.fillAll (juce::Colour (0xff4A90E2));
-    g.setColour (juce::Colours::white);
-    g.drawRect (getLocalBounds(), 2);
+    g.fillAll (BlueTheme::forComponent (*this).panel);
+    g.setColour (BlueTheme::forComponent (*this).border);
+    g.drawRect (getLocalBounds(), 1);
 }
 
 void PresetComponent::resized()

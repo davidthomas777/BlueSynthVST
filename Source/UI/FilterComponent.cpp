@@ -20,17 +20,17 @@ FilterComponent::FilterComponent (juce::AudioProcessorValueTreeState& apvts,
                                    juce::String envAmtId, juce::String slopeId)
 {
     filterTypeSelector.addItemList ({ "Low Pass", "High Pass", "Band Pass" }, 1);
-    filterTypeSelector.setColour (juce::ComboBox::backgroundColourId, juce::Colour (0xff4A90E2));
-    filterTypeSelector.setColour (juce::ComboBox::textColourId,       juce::Colours::white);
-    filterTypeSelector.setColour (juce::ComboBox::outlineColourId,    juce::Colours::white);
-    filterTypeSelector.setColour (juce::ComboBox::arrowColourId,      juce::Colours::white);
+    filterTypeSelector.setColour (juce::ComboBox::backgroundColourId, BlueTheme::forComponent (*this).control);
+    filterTypeSelector.setColour (juce::ComboBox::textColourId,       BlueTheme::forComponent (*this).text);
+    filterTypeSelector.setColour (juce::ComboBox::outlineColourId,    BlueTheme::forComponent (*this).border);
+    filterTypeSelector.setColour (juce::ComboBox::arrowColourId,      BlueTheme::forComponent (*this).accent);
     filterTypeAttachment = std::make_unique<ComboBoxAttachment> (apvts, filterTypeId, filterTypeSelector);
     addAndMakeVisible (filterTypeSelector);
     slopeSelector.addItemList ({ "12 dB/oct", "24 dB/oct", "36 dB/oct", "48 dB/oct" }, 1);
-    slopeSelector.setColour (juce::ComboBox::backgroundColourId, juce::Colour (0xff4A90E2));
-    slopeSelector.setColour (juce::ComboBox::textColourId, juce::Colours::white);
-    slopeSelector.setColour (juce::ComboBox::outlineColourId, juce::Colours::white);
-    slopeSelector.setColour (juce::ComboBox::arrowColourId, juce::Colours::white);
+    slopeSelector.setColour (juce::ComboBox::backgroundColourId, BlueTheme::forComponent (*this).control);
+    slopeSelector.setColour (juce::ComboBox::textColourId, BlueTheme::forComponent (*this).text);
+    slopeSelector.setColour (juce::ComboBox::outlineColourId, BlueTheme::forComponent (*this).border);
+    slopeSelector.setColour (juce::ComboBox::arrowColourId, BlueTheme::forComponent (*this).accent);
     slopeAttachment = std::make_unique<ComboBoxAttachment> (apvts, slopeId, slopeSelector);
     addAndMakeVisible (slopeSelector);
     updateSlopeLabels();
@@ -58,9 +58,10 @@ FilterComponent::~FilterComponent()
 
 void FilterComponent::paint (juce::Graphics& g)
 {
-    g.fillAll (juce::Colour (0xff4A90E2));
-    g.setColour (juce::Colours::white);
+    g.fillAll (BlueTheme::forComponent (*this).panel);
+    g.setColour (BlueTheme::forComponent (*this).border);
     g.drawRect (getLocalBounds(), 1);
+    g.setColour (BlueTheme::forComponent (*this).text);
     g.setFont (appFont (12.0f));
     g.drawText ("FILTER TYPE / SLOPE", getLocalBounds().reduced (6).withHeight (14),
                 juce::Justification::centredLeft);
@@ -123,16 +124,16 @@ void FilterComponent::setSliderWithLabel (juce::Slider& slider, juce::Label& lab
     slider.setSliderStyle (juce::Slider::SliderStyle::RotaryVerticalDrag);
     // Wide enough for CUTOFF's longest readout ("999Hz") without JUCE falling back to "...".
     slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 46, 19);
-    slider.setColour (juce::Slider::thumbColourId,               juce::Colours::white);
-    slider.setColour (juce::Slider::rotarySliderFillColourId,    juce::Colours::white);
-    slider.setColour (juce::Slider::rotarySliderOutlineColourId, juce::Colours::black);
-    slider.setColour (juce::Slider::textBoxTextColourId,         juce::Colours::white);
-    slider.setColour (juce::Slider::textBoxOutlineColourId,      juce::Colours::white);
+    slider.setColour (juce::Slider::thumbColourId,               BlueTheme::forComponent (*this).text);
+    slider.setColour (juce::Slider::rotarySliderFillColourId,    BlueTheme::forComponent (*this).accent);
+    slider.setColour (juce::Slider::rotarySliderOutlineColourId, BlueTheme::forComponent (*this).border);
+    slider.setColour (juce::Slider::textBoxTextColourId,         BlueTheme::forComponent (*this).text);
+    slider.setColour (juce::Slider::textBoxOutlineColourId,      BlueTheme::forComponent (*this).border);
     addAndMakeVisible (slider);
 
     attachment = std::make_unique<SliderAttachment> (apvts, paramId, slider);
 
-    label.setColour (juce::Label::textColourId, juce::Colours::white);
+    label.setColour (juce::Label::textColourId, BlueTheme::forComponent (*this).text);
     label.setFont (appFont (12.0f));
     label.setJustificationType (juce::Justification::centred);
     addAndMakeVisible (label);

@@ -7,14 +7,14 @@ class RouteLookAndFeel : public AppLookAndFeel
 public:
     void drawButtonBackground (juce::Graphics& g, juce::Button& button, const juce::Colour&, bool, bool) override
     {
-        g.setColour (button.getToggleState() ? juce::Colours::white : juce::Colour (0xff4a90e2));
+        g.setColour (button.getToggleState() ? BlueTheme::forComponent (button).text : BlueTheme::forComponent (button).panel);
         g.fillRect (button.getLocalBounds());
-        g.setColour (juce::Colours::white);
+        g.setColour (BlueTheme::forComponent (button).border);
         g.drawRect (button.getLocalBounds());
     }
     void drawButtonText (juce::Graphics& g, juce::TextButton& button, bool, bool) override
     {
-        g.setColour (button.getToggleState() ? juce::Colour (0xff4a90e2) : juce::Colours::white);
+        g.setColour (button.getToggleState() ? BlueTheme::forComponent (button).panel : BlueTheme::forComponent (button).text);
         g.setFont (appFont (11));
         g.drawText (button.getButtonText(), button.getLocalBounds(), juce::Justification::centred);
     }
@@ -33,10 +33,10 @@ class RouteEditor : public juce::Component
         depth.setTextBoxStyle (juce::Slider::TextBoxRight, false, 58, 22);
         depth.setTooltip ("Signed depth as a fraction of the destination range");
         depth.setNumDecimalPlacesToDisplay (3);
-        depth.setColour (juce::Slider::thumbColourId, juce::Colours::white);
-        depth.setColour (juce::Slider::trackColourId, juce::Colours::white);
-        depth.setColour (juce::Slider::backgroundColourId, juce::Colours::black);
-        depth.setColour (juce::Slider::textBoxOutlineColourId, juce::Colours::white);
+        depth.setColour (juce::Slider::thumbColourId, BlueTheme::forComponent (*this).text);
+        depth.setColour (juce::Slider::trackColourId, BlueTheme::forComponent (*this).accent);
+        depth.setColour (juce::Slider::backgroundColourId, BlueTheme::forComponent (*this).border);
+        depth.setColour (juce::Slider::textBoxOutlineColourId, BlueTheme::forComponent (*this).border);
         addAndMakeVisible (depth);
         depthAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
             state, Modulation::routeID (s, t, "DEPTH"), depth);
@@ -66,8 +66,8 @@ class RouteEditor : public juce::Component
     }
     void paint (juce::Graphics &g) override
     {
-        g.fillAll (juce::Colour (0xff4a90e2));
-        g.setColour (juce::Colours::white);
+        g.fillAll (BlueTheme::forComponent (*this).panel);
+        g.setColour (BlueTheme::forComponent (*this).border);
         g.drawRect (getLocalBounds ());
     }
     void resized () override
@@ -98,8 +98,24 @@ void ModSlider::editRoute (int source)
     engine->selectedSource.store (source);
     engine->setRouteAssigned (source, target, true);
     auto *parent = getTopLevelComponent ();
-    juce::CallOutBox::launchAsynchronously (std::make_unique<RouteEditor> (*engine, source, target),
-                                            parent->getLocalArea (this, getLocalBounds ()), parent);
+    auto routeEditor = std::make_unique<RouteEditor> (*engine, source, target);
+    routeEditor->setComponentID ("LFO_ROUTE_EDITOR");
+    for (auto* component = static_cast<juce::Component*> (this); component != nullptr;
+         component = component->getParentComponent())
+        if (component->getProperties().contains (BlueTheme::themeProperty))
+        {
+            routeEditor->getProperties().set (BlueTheme::themeProperty,
+                                              component->getProperties()[BlueTheme::themeProperty]);
+            for (const auto& property : BlueTheme::colourProperties())
+                if (component->getProperties().contains (property))
+                    routeEditor->getProperties().set (property, component->getProperties()[property]);
+            break;
+        }
+    BlueTheme::applyToTree (*routeEditor, BlueTheme::forComponent (*this));
+    auto* routeLookAndFeel = &routeEditor->getLookAndFeel();
+    auto& callout = juce::CallOutBox::launchAsynchronously (std::move (routeEditor),
+                                                           parent->getLocalArea (this, getLocalBounds ()), parent);
+    callout.setLookAndFeel (routeLookAndFeel);
 }
 void ModSlider::itemDropped (const SourceDetails &d)
 {
@@ -133,7 +149,7 @@ void ModSlider::paint (juce::Graphics &g)
     juce::Slider::paint (g);
     if (hovering)
     {
-        g.setColour (juce::Colours::white);
+        g.setColour (BlueTheme::forComponent (*this).text);
         g.drawRect (getLocalBounds (), 2);
     }
     if (engine == nullptr || target < 0)
@@ -164,7 +180,7 @@ void ModSlider::paint (juce::Graphics &g)
         float a = position (read ("BIPOLAR") > .5f ? moved (-depth) : base), b = position (moved (depth));
         if (a > b)
             std::swap (a, b);
-        const auto colour = s == engine->selectedSource.load () ? juce::Colours::white : juce::Colour (0xffa2e5ff);
+        const auto colour = s == engine->selectedSource.load () ? BlueTheme::forComponent (*this).text : juce::Colour (0xffa2e5ff);
         g.setColour (colour.withAlpha (read ("BYPASS") > .5f ? .25f : .9f));
         if (isRotary ())
         {

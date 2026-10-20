@@ -7,22 +7,22 @@ LfoComponent::LfoComponent (Modulation::Engine &e) : engine (e)
     {
         addAndMakeVisible (*b);
         b->setClickingTogglesState (b != &handle);
-        b->setColour (juce::TextButton::buttonColourId, juce::Colour (0xff4a90e2));
-        b->setColour (juce::TextButton::buttonOnColourId, juce::Colours::white);
-        b->setColour (juce::TextButton::textColourOffId, juce::Colours::white);
-        b->setColour (juce::TextButton::textColourOnId, juce::Colour (0xff4a90e2));
+        b->setColour (juce::TextButton::buttonColourId, BlueTheme::forComponent (*this).control);
+        b->setColour (juce::TextButton::buttonOnColourId, BlueTheme::forComponent (*this).accent);
+        b->setColour (juce::TextButton::textColourOffId, BlueTheme::forComponent (*this).text);
+        b->setColour (juce::TextButton::textColourOnId, BlueTheme::forComponent (*this).canvas);
     }
     for (auto *box : {&shapes, &division})
     {
-        box->setColour (juce::ComboBox::backgroundColourId, juce::Colour (0xff4a90e2));
-        box->setColour (juce::ComboBox::outlineColourId, juce::Colours::white);
-        box->setColour (juce::ComboBox::textColourId, juce::Colours::white);
-        box->setColour (juce::ComboBox::arrowColourId, juce::Colours::white);
+        box->setColour (juce::ComboBox::backgroundColourId, BlueTheme::forComponent (*this).control);
+        box->setColour (juce::ComboBox::outlineColourId, BlueTheme::forComponent (*this).border);
+        box->setColour (juce::ComboBox::textColourId, BlueTheme::forComponent (*this).text);
+        box->setColour (juce::ComboBox::arrowColourId, BlueTheme::forComponent (*this).accent);
     }
-    rate.setColour (juce::Slider::thumbColourId, juce::Colours::white);
-    rate.setColour (juce::Slider::trackColourId, juce::Colours::white);
-    rate.setColour (juce::Slider::backgroundColourId, juce::Colours::black);
-    rate.setColour (juce::Slider::textBoxOutlineColourId, juce::Colours::white);
+    rate.setColour (juce::Slider::thumbColourId, BlueTheme::forComponent (*this).text);
+    rate.setColour (juce::Slider::trackColourId, BlueTheme::forComponent (*this).accent);
+    rate.setColour (juce::Slider::backgroundColourId, BlueTheme::forComponent (*this).border);
+    rate.setColour (juce::Slider::textBoxOutlineColourId, BlueTheme::forComponent (*this).border);
     tab1.onClick = [this] { select (0); };
     tab2.onClick = [this] { select (1); };
     addAndMakeVisible (handle);
@@ -104,8 +104,8 @@ void LfoComponent::refresh ()
 }
 void LfoComponent::paint (juce::Graphics &g)
 {
-    g.fillAll (juce::Colour (0xff4a90e2));
-    g.setColour (juce::Colours::white);
+    g.fillAll (BlueTheme::forComponent (*this).panel);
+    g.setColour (BlueTheme::forComponent (*this).border);
     g.drawRect (getLocalBounds (), 1);
 }
 void LfoComponent::resized ()
@@ -188,13 +188,13 @@ void LfoComponent::Curve::timerCallback ()
 }
 void LfoComponent::Curve::paint (juce::Graphics &g)
 {
-    g.fillAll (juce::Colour (0xff4a90e2));
+    g.fillAll (BlueTheme::forComponent (*this).inset);
     auto s = owner.engine.getShape (owner.source);
-    g.setColour (juce::Colours::white.withAlpha (.12f));
-    for (int i = 0; i <= 8; ++i)
+    g.setColour (BlueTheme::forComponent (*this).text.withAlpha (.12f));
+    for (int i = 1; i < 8; ++i)
         g.drawVerticalLine (getWidth () * i / 8, 0, (float) getHeight ());
-    g.setColour (juce::Colours::white.withAlpha (.2f));
-    for (int i = 0; i <= 4; ++i)
+    g.setColour (BlueTheme::forComponent (*this).text.withAlpha (.2f));
+    for (int i = 1; i < 4; ++i)
         g.drawHorizontalLine (getHeight () * i / 4, 0, (float)getWidth ());
     juce::Path path;
     for (int x = 0; x <= getWidth (); ++x)
@@ -205,7 +205,7 @@ void LfoComponent::Curve::paint (juce::Graphics &g)
         else
             path.lineTo ((float)x, y);
     }
-    g.setColour (juce::Colours::white);
+    g.setColour (BlueTheme::forComponent (*this).accent);
     g.strokePath (path, juce::PathStrokeType (1.5f));
     if (!s.sine)
         for (int i = 0; i < s.size; ++i)
@@ -213,7 +213,7 @@ void LfoComponent::Curve::paint (juce::Graphics &g)
     if (playbackActive)
     {
         const float x = playheadPhase * getWidth ();
-        g.setColour (juce::Colours::white.withAlpha (.6f));
+        g.setColour (BlueTheme::forComponent (*this).text.withAlpha (.6f));
         g.drawLine (x, 0.0f, x, (float) getHeight (), 1.0f);
     }
 }

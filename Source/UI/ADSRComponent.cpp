@@ -40,12 +40,12 @@ ADSRComponent::~ADSRComponent()
 
 void ADSRComponent::paint (juce::Graphics& g)
 {
-    g.fillAll (juce::Colour (0xff4A90E2));
+    g.fillAll (BlueTheme::forComponent (*this).panel);
 
-    g.setColour (juce::Colours::white);
+    g.setColour (BlueTheme::forComponent (*this).border);
     g.drawRect (getLocalBounds(), 1);
 
-    g.setColour (juce::Colours::white);
+    g.setColour (BlueTheme::forComponent (*this).text);
     g.setFont (appFont (12.0f));
     g.drawText (titleText, getLocalBounds().reduced (6).withHeight (14), juce::Justification::centredLeft);
 }
@@ -89,16 +89,16 @@ void ADSRComponent::setSliderParams (juce::Slider& slider, juce::Label& label, c
     slider.textFromValueFunction = [](double value) { return juce::String (value, 2); };
     slider.valueFromTextFunction = [](const juce::String& text) { return text.getDoubleValue(); };
 
-    slider.setColour (juce::Slider::trackColourId,          juce::Colours::white);
-    slider.setColour (juce::Slider::backgroundColourId,     juce::Colours::black);
-    slider.setColour (juce::Slider::thumbColourId,          juce::Colours::white);
-    slider.setColour (juce::Slider::textBoxOutlineColourId, juce::Colours::white);
+    slider.setColour (juce::Slider::trackColourId,          BlueTheme::forComponent (*this).accent);
+    slider.setColour (juce::Slider::backgroundColourId,     BlueTheme::forComponent (*this).border);
+    slider.setColour (juce::Slider::thumbColourId,          BlueTheme::forComponent (*this).text);
+    slider.setColour (juce::Slider::textBoxOutlineColourId, BlueTheme::forComponent (*this).border);
 
     addAndMakeVisible (slider);
 
     label.setText (labelText, juce::dontSendNotification);
     label.setFont (appFont (12.0f));
-    label.setColour (juce::Label::textColourId, juce::Colours::white);
+    label.setColour (juce::Label::textColourId, BlueTheme::forComponent (*this).text);
     label.setJustificationType (juce::Justification::centred);
     addAndMakeVisible (label);
 }

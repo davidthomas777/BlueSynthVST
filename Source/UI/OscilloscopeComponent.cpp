@@ -9,12 +9,7 @@
 */
 
 #include "OscilloscopeComponent.h"
-
-namespace
-{
-    const juce::Colour kBackgroundColour { 0xff4a90e2 };
-    const juce::Colour kWaveformColour   { juce::Colours::white };
-}
+#include "AppFont.h"
 
 OscilloscopeComponent::OscilloscopeComponent()
 {
@@ -70,7 +65,12 @@ void OscilloscopeComponent::setDisplayFrequency (float hz, double sampleRateToUs
 
 void OscilloscopeComponent::paint (juce::Graphics& g)
 {
-    g.fillAll (kBackgroundColour);
+    g.fillAll (BlueTheme::forComponent (*this).inset);
+
+    g.setColour (BlueTheme::forComponent (*this).border.withAlpha (0.35f));
+    g.drawHorizontalLine (getHeight() / 2, 0.0f, (float) getWidth());
+    for (int division = 1; division < 4; ++division)
+        g.drawVerticalLine (getWidth() * division / 4, 0.0f, (float) getHeight());
 
     const int n     = (int) ring.size();
     const int width = getWidth();
@@ -168,7 +168,7 @@ void OscilloscopeComponent::paint (juce::Graphics& g)
 
     // Filling alone leaves quiet passages a near-invisible sliver, since the shape's thickness
     // is just the peak-to-peak amplitude; stroking the same path adds a minimum line weight.
-    g.setColour (kWaveformColour);
+    g.setColour (BlueTheme::forComponent (*this).accent);
     g.fillPath (path);
     g.strokePath (path, juce::PathStrokeType (1.5f));
 }

@@ -10,6 +10,7 @@
 #include "PluginEditor.h"
 #include "SynthSound.h"
 #include "SynthVoice.h"
+#include "UI/AppFont.h"
 
 //==============================================================================
 BlueSynthAudioProcessor::BlueSynthAudioProcessor()
@@ -24,6 +25,9 @@ BlueSynthAudioProcessor::BlueSynthAudioProcessor()
                        ), apvts (*this, &undoManager, "Parameters", createParameters())
 #endif
 {
+    for (int i = 0; i < BlueTheme::colourCount; ++i)
+        customThemeColours[(size_t) i].store (BlueTheme::colourAt (BlueTheme::midnight, i).getARGB(),
+                                              std::memory_order_relaxed);
     voiceState.modulation = &modulation;
     presetManager.modulation = &modulation;
     modulation.onShapeChanged = [this] { updateHostDisplay (ChangeDetails{}.withNonParameterStateChanged (true)); };
@@ -345,6 +349,10 @@ void BlueSynthAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
     auto state = modulation.copyState();
     state.setProperty ("presetName", presetManager.getCurrentPresetName(), nullptr);
+    state.setProperty ("uiTheme", getUiTheme(), nullptr);
+    const auto& colourProperties = BlueTheme::colourProperties();
+    for (int i = 0; i < BlueTheme::colourCount; ++i)
+        state.setProperty (colourProperties[(size_t) i], (juce::int64) getUiThemeColour (i).getARGB(), nullptr);
     std::unique_ptr<juce::XmlElement> xml (state.createXml());
     if (xml != nullptr)
         copyXmlToBinary (*xml, destData);
@@ -370,10 +378,51 @@ void BlueSynthAudioProcessor::setStateInformation (const void* data, int sizeInB
             }
             Modulation::Engine::migrate (state);
             presetManager.setCurrentPresetName (state.getProperty ("presetName").toString(), false);
+            uiTheme.store (juce::jlimit (0, 2, (int) state.getProperty ("uiTheme", 0)), std::memory_order_relaxed);
+            const auto& colourProperties = BlueTheme::colourProperties();
+            for (int i = 0; i < BlueTheme::colourCount; ++i)
+            {
+                const auto fallback = (juce::int64) BlueTheme::colourAt (BlueTheme::midnight, i).getARGB();
+                customThemeColours[(size_t) i].store ((juce::uint32) (juce::int64)
+                    state.getProperty (colourProperties[(size_t) i], fallback), std::memory_order_relaxed);
+            }
             modulation.replaceState (state);
             undoManager.clearUndoHistory ();
         }
     }
+}
+
+void BlueSynthAudioProcessor::setUiTheme (int index)
+{
+    index = juce::jlimit (0, 2, index);
+    if (uiTheme.exchange (index, std::memory_order_relaxed) != index)
+        updateHostDisplay (ChangeDetails{}.withNonParameterStateChanged (true));
+}
+
+juce::Colour BlueSynthAudioProcessor::getUiThemeColour (int index) const
+{
+    return juce::Colour (customThemeColours[(size_t) juce::jlimit (0, BlueTheme::colourCount - 1, index)]
+                             .load (std::memory_order_relaxed));
+}
+
+void BlueSynthAudioProcessor::setUiThemeColour (int index, juce::Colour colour)
+{
+    if (index < 0 || index >= BlueTheme::colourCount)
+        return;
+    const auto old = customThemeColours[(size_t) index].exchange (colour.getARGB(), std::memory_order_relaxed);
+    const auto oldTheme = uiTheme.exchange (2, std::memory_order_relaxed);
+    if (old != colour.getARGB() || oldTheme != 2)
+        updateHostDisplay (ChangeDetails{}.withNonParameterStateChanged (true));
+}
+
+void BlueSynthAudioProcessor::makeCustomThemeFromPreset (int presetIndex)
+{
+    const auto& palette = presetIndex == 0 ? BlueTheme::classic : BlueTheme::midnight;
+    for (int i = 0; i < BlueTheme::colourCount; ++i)
+        customThemeColours[(size_t) i].store (BlueTheme::colourAt (palette, i).getARGB(),
+                                              std::memory_order_relaxed);
+    uiTheme.store (2, std::memory_order_relaxed);
+    updateHostDisplay (ChangeDetails{}.withNonParameterStateChanged (true));
 }
 
 //==============================================================================

@@ -102,6 +102,67 @@ static constexpr int   kWindowHeight     = kSideY + kSideH + kGapY * 2;   // = 8
 static constexpr int kBoxY = kToggleY;
 // ---------------------------------------------------------------------------
 
+class ThemeColourEditor : public juce::Component, private juce::ChangeListener
+{
+public:
+    ThemeColourEditor (BlueSynthAudioProcessor& processorToUse, std::function<void()> onColourChanged)
+        : processor (processorToUse), changed (std::move (onColourChanged)),
+          selector (juce::ColourSelector::showColourAtTop | juce::ColourSelector::showSliders |
+                    juce::ColourSelector::showColourspace)
+    {
+        roles.addItemList ({ "Background", "Panels", "Graphs", "Controls", "Borders",
+                             "Text", "Muted text", "Accent", "Knob tracks" }, 1);
+        roles.onChange = [this] { loadSelectedColour(); };
+        addAndMakeVisible (roles);
+        selector.addChangeListener (this);
+        addAndMakeVisible (selector);
+        roles.setSelectedId (8, juce::sendNotificationSync);
+        setSize (300, 350);
+    }
+
+    ~ThemeColourEditor() override { selector.removeChangeListener (this); }
+
+    void paint (juce::Graphics& g) override
+    {
+        const auto palette = BlueTheme::forComponent (*this);
+        g.fillAll (palette.panel);
+        g.setColour (palette.border);
+        g.drawRect (getLocalBounds());
+    }
+
+    void resized() override
+    {
+        roles.setBounds (8, 8, getWidth() - 16, 26);
+        selector.setBounds (8, 42, getWidth() - 16, getHeight() - 50);
+    }
+
+private:
+    void loadSelectedColour()
+    {
+        const int role = roles.getSelectedId() - 1;
+        if (role >= 0)
+            selector.setCurrentColour (processor.getUiThemeColour (role), juce::dontSendNotification);
+    }
+
+    void changeListenerCallback (juce::ChangeBroadcaster*) override
+    {
+        const int role = roles.getSelectedId() - 1;
+        if (role >= 0 && selector.getCurrentColour() != processor.getUiThemeColour (role))
+        {
+            processor.setUiThemeColour (role, selector.getCurrentColour());
+            getProperties().set (BlueTheme::colourProperties()[(size_t) role],
+                                 (juce::int64) selector.getCurrentColour().getARGB());
+            BlueTheme::applyToTree (*this, BlueTheme::forComponent (*this));
+            changed();
+        }
+    }
+
+    BlueSynthAudioProcessor& processor;
+    std::function<void()> changed;
+    juce::ComboBox roles;
+    juce::ColourSelector selector;
+};
+
 //==============================================================================
 BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProcessor& p)
     : AudioProcessorEditor (&p), audioProcessor (p),
@@ -115,12 +176,36 @@ BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProc
       filterEnv2       (audioProcessor.apvts, "FILTERENVATTACK2", "FILTERENVDECAY2", "FILTERENVSUSTAIN2", "FILTERENVRELEASE2", "FILTER ENV"),
       osc2             (audioProcessor.apvts, "FMFREQ2",          "FMDEPTH2",        "UNISONVOICES2",     "UNISONDETUNE2")
 {
+    getProperties().set (BlueTheme::themeProperty, audioProcessor.getUiTheme());
     editorLookAndFeel.setDefaultSansSerifTypeface (appTypeface (500));
     setLookAndFeel (&editorLookAndFeel);
     setSize (kWindowWidth, kWindowHeight);
 
     addAndMakeVisible (pianoComponent);
     addAndMakeVisible (lfoComponent);
+
+    themeLabel.setText ("THEME", juce::dontSendNotification);
+    themeLabel.setFont (appFont (10.5f, 600));
+    addAndMakeVisible (themeLabel);
+    themeSelector.addItem ("Classic Blue", 1);
+    themeSelector.addItem ("Midnight", 2);
+    themeSelector.addItem ("Custom", 3);
+    themeSelector.setComponentID ("UI_THEME");
+    themeSelector.setTooltip ("Choose the colour theme for this plugin instance");
+    themeSelector.onChange = [this]
+    {
+        const int index = themeSelector.getSelectedId() - 1;
+        if (index >= 0)
+        {
+            audioProcessor.setUiTheme (index);
+            applyTheme (index);
+        }
+    };
+    addAndMakeVisible (themeSelector);
+    editThemeButton.setTooltip ("Edit the colours of the selected theme");
+    editThemeButton.setComponentID ("EDIT_THEME");
+    editThemeButton.onClick = [this] { editTheme(); };
+    addAndMakeVisible (editThemeButton);
 
     // OscilloscopeComponent sizes its own window from the played pitch and is repainted by
     // the timer below, so there is nothing to configure here.
@@ -137,24 +222,24 @@ BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProc
     auto styleKnob = [this](juce::Slider& s) {
         s.setSliderStyle (juce::Slider::RotaryVerticalDrag);
         s.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 36, 19);
-        s.setColour (juce::Slider::thumbColourId,               juce::Colours::white);
-        s.setColour (juce::Slider::rotarySliderFillColourId,    juce::Colours::white);
-        s.setColour (juce::Slider::rotarySliderOutlineColourId, juce::Colours::black);
-        s.setColour (juce::Slider::textBoxTextColourId,         juce::Colours::white);
-        s.setColour (juce::Slider::textBoxOutlineColourId,      juce::Colours::white);
+        s.setColour (juce::Slider::thumbColourId,               BlueTheme::forComponent (*this).text);
+        s.setColour (juce::Slider::rotarySliderFillColourId,    BlueTheme::forComponent (*this).accent);
+        s.setColour (juce::Slider::rotarySliderOutlineColourId, BlueTheme::forComponent (*this).border);
+        s.setColour (juce::Slider::textBoxTextColourId,         BlueTheme::forComponent (*this).text);
+        s.setColour (juce::Slider::textBoxOutlineColourId,      BlueTheme::forComponent (*this).border);
         s.setLookAndFeel (&topKnobLookAndFeel);
     };
-    auto styleLabel = [](juce::Label& l, const juce::String& text) {
+    auto styleLabel = [this](juce::Label& l, const juce::String& text) {
         l.setText (text, juce::dontSendNotification);
         l.setFont (appFont (10.5f, 600));
-        l.setColour (juce::Label::textColourId, juce::Colours::white);
+        l.setColour (juce::Label::textColourId, BlueTheme::forComponent (*this).text);
         l.setJustificationType (juce::Justification::centred);
     };
 
     auto styleHistoryButton = [this] (juce::TextButton &button)
     {
-        button.setColour (juce::TextButton::buttonColourId, juce::Colour (0xff4A90E2));
-        button.setColour (juce::TextButton::textColourOffId, juce::Colours::white);
+        button.setColour (juce::TextButton::buttonColourId, BlueTheme::forComponent (*this).control);
+        button.setColour (juce::TextButton::textColourOffId, BlueTheme::forComponent (*this).text);
         addAndMakeVisible (button);
     };
     styleHistoryButton (undoButton);
@@ -189,10 +274,10 @@ BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProc
     glideAlwaysButton.setClickingTogglesState (true);
     glideAlwaysButton.setTitle ("Always glide");
     glideAlwaysButton.setTooltip ("Glide into every note, not just overlapping (legato) ones");
-    glideAlwaysButton.setColour (juce::TextButton::buttonColourId,   juce::Colour (0xff4A90E2));
-    glideAlwaysButton.setColour (juce::TextButton::buttonOnColourId, juce::Colours::white);
-    glideAlwaysButton.setColour (juce::TextButton::textColourOffId,  juce::Colours::white);
-    glideAlwaysButton.setColour (juce::TextButton::textColourOnId,   juce::Colour (0xff4A90E2));
+    glideAlwaysButton.setColour (juce::TextButton::buttonColourId,   BlueTheme::forComponent (*this).control);
+    glideAlwaysButton.setColour (juce::TextButton::buttonOnColourId, BlueTheme::forComponent (*this).accent);
+    glideAlwaysButton.setColour (juce::TextButton::textColourOffId,  BlueTheme::forComponent (*this).text);
+    glideAlwaysButton.setColour (juce::TextButton::textColourOnId,   BlueTheme::forComponent (*this).canvas);
     glideAlwaysAttachment = std::make_unique<ButtonAttachment> (audioProcessor.apvts, "GLIDEALWAYS", glideAlwaysButton);
     addAndMakeVisible (glideAlwaysButton);
 
@@ -205,18 +290,18 @@ BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProc
 
     // ---- Osc 1 enable toggle ----
     osc1EnableButton.setButtonText ("OSC 1");
-    osc1EnableButton.setColour (juce::ToggleButton::textColourId,         juce::Colours::white);
-    osc1EnableButton.setColour (juce::ToggleButton::tickColourId,         juce::Colours::white);
-    osc1EnableButton.setColour (juce::ToggleButton::tickDisabledColourId, juce::Colours::white);
+    osc1EnableButton.setColour (juce::ToggleButton::textColourId,         BlueTheme::forComponent (*this).text);
+    osc1EnableButton.setColour (juce::ToggleButton::tickColourId,         BlueTheme::forComponent (*this).text);
+    osc1EnableButton.setColour (juce::ToggleButton::tickDisabledColourId, BlueTheme::forComponent (*this).border);
     osc1EnableAttachment = std::make_unique<ButtonAttachment> (audioProcessor.apvts, "OSC1ENABLED", osc1EnableButton);
     addAndMakeVisible (osc1EnableButton);
 
     // ---- Osc 1 volume knob ----
     osc1VolumeKnob.setSliderStyle (juce::Slider::RotaryVerticalDrag);
     styleKnob (osc1VolumeKnob);
-    osc1VolumeKnob.setColour (juce::Slider::thumbColourId,               juce::Colours::white);
-    osc1VolumeKnob.setColour (juce::Slider::rotarySliderFillColourId,    juce::Colours::white);
-    osc1VolumeKnob.setColour (juce::Slider::rotarySliderOutlineColourId, juce::Colours::black);
+    osc1VolumeKnob.setColour (juce::Slider::thumbColourId,               BlueTheme::forComponent (*this).text);
+    osc1VolumeKnob.setColour (juce::Slider::rotarySliderFillColourId,    BlueTheme::forComponent (*this).accent);
+    osc1VolumeKnob.setColour (juce::Slider::rotarySliderOutlineColourId, BlueTheme::forComponent (*this).border);
     osc1VolumeAttachment = std::make_unique<SliderAttachment> (audioProcessor.apvts, "OSC1GAIN", osc1VolumeKnob);
     osc1VolumeKnob.setComponentID("OSC1GAIN");
     addAndMakeVisible (osc1VolumeKnob);
@@ -228,9 +313,9 @@ BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProc
     // ---- Osc 1 pitch knob ----
     osc1PitchKnob.setSliderStyle (juce::Slider::RotaryVerticalDrag);
     styleKnob (osc1PitchKnob);
-    osc1PitchKnob.setColour (juce::Slider::thumbColourId,               juce::Colours::white);
-    osc1PitchKnob.setColour (juce::Slider::rotarySliderFillColourId,    juce::Colours::white);
-    osc1PitchKnob.setColour (juce::Slider::rotarySliderOutlineColourId, juce::Colours::black);
+    osc1PitchKnob.setColour (juce::Slider::thumbColourId,               BlueTheme::forComponent (*this).text);
+    osc1PitchKnob.setColour (juce::Slider::rotarySliderFillColourId,    BlueTheme::forComponent (*this).accent);
+    osc1PitchKnob.setColour (juce::Slider::rotarySliderOutlineColourId, BlueTheme::forComponent (*this).border);
     osc1PitchKnob.setNumDecimalPlacesToDisplay (0);
     osc1PitchAttachment = std::make_unique<SliderAttachment> (audioProcessor.apvts, "OSC1PITCH", osc1PitchKnob);
     osc1PitchKnob.setComponentID("OSC1PITCH");
@@ -243,9 +328,9 @@ BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProc
     // ---- Osc 1 octave knob ----
     osc1OctaveKnob.setSliderStyle (juce::Slider::RotaryVerticalDrag);
     styleKnob (osc1OctaveKnob);
-    osc1OctaveKnob.setColour (juce::Slider::thumbColourId,               juce::Colours::white);
-    osc1OctaveKnob.setColour (juce::Slider::rotarySliderFillColourId,    juce::Colours::white);
-    osc1OctaveKnob.setColour (juce::Slider::rotarySliderOutlineColourId, juce::Colours::black);
+    osc1OctaveKnob.setColour (juce::Slider::thumbColourId,               BlueTheme::forComponent (*this).text);
+    osc1OctaveKnob.setColour (juce::Slider::rotarySliderFillColourId,    BlueTheme::forComponent (*this).accent);
+    osc1OctaveKnob.setColour (juce::Slider::rotarySliderOutlineColourId, BlueTheme::forComponent (*this).border);
     osc1OctaveKnob.setNumDecimalPlacesToDisplay (0);
     osc1OctaveAttachment = std::make_unique<SliderAttachment> (audioProcessor.apvts, "OSC1OCTAVE", osc1OctaveKnob);
     osc1OctaveKnob.setComponentID("OSC1OCTAVE");
@@ -259,27 +344,27 @@ BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProc
     // The shared choice list must stay indexed like OscData::setWaveType().
     const auto waveChoices = waveformChoices();
     oscWaveSelector.addItemList (waveChoices, 1);
-    oscWaveSelector.setColour (juce::ComboBox::backgroundColourId, juce::Colour (0xff4A90E2));
-    oscWaveSelector.setColour (juce::ComboBox::textColourId,       juce::Colours::white);
-    oscWaveSelector.setColour (juce::ComboBox::outlineColourId,    juce::Colours::white);
-    oscWaveSelector.setColour (juce::ComboBox::arrowColourId,      juce::Colours::white);
+    oscWaveSelector.setColour (juce::ComboBox::backgroundColourId, BlueTheme::forComponent (*this).control);
+    oscWaveSelector.setColour (juce::ComboBox::textColourId,       BlueTheme::forComponent (*this).text);
+    oscWaveSelector.setColour (juce::ComboBox::outlineColourId,    BlueTheme::forComponent (*this).border);
+    oscWaveSelector.setColour (juce::ComboBox::arrowColourId,      BlueTheme::forComponent (*this).accent);
     addAndMakeVisible (oscWaveSelector);
     waveSelectorAttachment = std::make_unique<ComboBoxAttachment> (audioProcessor.apvts, "OSC1WAVETYPE", oscWaveSelector);
 
     // ---- Osc 2 enable toggle ----
     osc2EnableButton.setButtonText ("OSC 2");
-    osc2EnableButton.setColour (juce::ToggleButton::textColourId,         juce::Colours::white);
-    osc2EnableButton.setColour (juce::ToggleButton::tickColourId,         juce::Colours::white);
-    osc2EnableButton.setColour (juce::ToggleButton::tickDisabledColourId, juce::Colours::white);
+    osc2EnableButton.setColour (juce::ToggleButton::textColourId,         BlueTheme::forComponent (*this).text);
+    osc2EnableButton.setColour (juce::ToggleButton::tickColourId,         BlueTheme::forComponent (*this).text);
+    osc2EnableButton.setColour (juce::ToggleButton::tickDisabledColourId, BlueTheme::forComponent (*this).border);
     osc2EnableAttachment = std::make_unique<ButtonAttachment> (audioProcessor.apvts, "OSC2ENABLED", osc2EnableButton);
     addAndMakeVisible (osc2EnableButton);
 
     // ---- Osc 2 volume knob ----
     osc2VolumeKnob.setSliderStyle (juce::Slider::RotaryVerticalDrag);
     styleKnob (osc2VolumeKnob);
-    osc2VolumeKnob.setColour (juce::Slider::thumbColourId,               juce::Colours::white);
-    osc2VolumeKnob.setColour (juce::Slider::rotarySliderFillColourId,    juce::Colours::white);
-    osc2VolumeKnob.setColour (juce::Slider::rotarySliderOutlineColourId, juce::Colours::black);
+    osc2VolumeKnob.setColour (juce::Slider::thumbColourId,               BlueTheme::forComponent (*this).text);
+    osc2VolumeKnob.setColour (juce::Slider::rotarySliderFillColourId,    BlueTheme::forComponent (*this).accent);
+    osc2VolumeKnob.setColour (juce::Slider::rotarySliderOutlineColourId, BlueTheme::forComponent (*this).border);
     osc2VolumeAttachment = std::make_unique<SliderAttachment> (audioProcessor.apvts, "OSC2GAIN", osc2VolumeKnob);
     osc2VolumeKnob.setComponentID("OSC2GAIN");
     addAndMakeVisible (osc2VolumeKnob);
@@ -291,9 +376,9 @@ BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProc
     // ---- Osc 2 pitch knob ----
     osc2PitchKnob.setSliderStyle (juce::Slider::RotaryVerticalDrag);
     styleKnob (osc2PitchKnob);
-    osc2PitchKnob.setColour (juce::Slider::thumbColourId,               juce::Colours::white);
-    osc2PitchKnob.setColour (juce::Slider::rotarySliderFillColourId,    juce::Colours::white);
-    osc2PitchKnob.setColour (juce::Slider::rotarySliderOutlineColourId, juce::Colours::black);
+    osc2PitchKnob.setColour (juce::Slider::thumbColourId,               BlueTheme::forComponent (*this).text);
+    osc2PitchKnob.setColour (juce::Slider::rotarySliderFillColourId,    BlueTheme::forComponent (*this).accent);
+    osc2PitchKnob.setColour (juce::Slider::rotarySliderOutlineColourId, BlueTheme::forComponent (*this).border);
     osc2PitchKnob.setNumDecimalPlacesToDisplay (0);
     osc2PitchAttachment = std::make_unique<SliderAttachment> (audioProcessor.apvts, "OSC2PITCH", osc2PitchKnob);
     osc2PitchKnob.setComponentID("OSC2PITCH");
@@ -306,9 +391,9 @@ BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProc
     // ---- Osc 2 octave knob ----
     osc2OctaveKnob.setSliderStyle (juce::Slider::RotaryVerticalDrag);
     styleKnob (osc2OctaveKnob);
-    osc2OctaveKnob.setColour (juce::Slider::thumbColourId,               juce::Colours::white);
-    osc2OctaveKnob.setColour (juce::Slider::rotarySliderFillColourId,    juce::Colours::white);
-    osc2OctaveKnob.setColour (juce::Slider::rotarySliderOutlineColourId, juce::Colours::black);
+    osc2OctaveKnob.setColour (juce::Slider::thumbColourId,               BlueTheme::forComponent (*this).text);
+    osc2OctaveKnob.setColour (juce::Slider::rotarySliderFillColourId,    BlueTheme::forComponent (*this).accent);
+    osc2OctaveKnob.setColour (juce::Slider::rotarySliderOutlineColourId, BlueTheme::forComponent (*this).border);
     osc2OctaveKnob.setNumDecimalPlacesToDisplay (0);
     osc2OctaveAttachment = std::make_unique<SliderAttachment> (audioProcessor.apvts, "OSC2OCTAVE", osc2OctaveKnob);
     osc2OctaveKnob.setComponentID("OSC2OCTAVE");
@@ -320,10 +405,10 @@ BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProc
 
     // ---- Osc 2 wave selector ----
     osc2WaveSelector.addItemList (waveChoices, 1);
-    osc2WaveSelector.setColour (juce::ComboBox::backgroundColourId, juce::Colour (0xff4A90E2));
-    osc2WaveSelector.setColour (juce::ComboBox::textColourId,       juce::Colours::white);
-    osc2WaveSelector.setColour (juce::ComboBox::outlineColourId,    juce::Colours::white);
-    osc2WaveSelector.setColour (juce::ComboBox::arrowColourId,      juce::Colours::white);
+    osc2WaveSelector.setColour (juce::ComboBox::backgroundColourId, BlueTheme::forComponent (*this).control);
+    osc2WaveSelector.setColour (juce::ComboBox::textColourId,       BlueTheme::forComponent (*this).text);
+    osc2WaveSelector.setColour (juce::ComboBox::outlineColourId,    BlueTheme::forComponent (*this).border);
+    osc2WaveSelector.setColour (juce::ComboBox::arrowColourId,      BlueTheme::forComponent (*this).accent);
     addAndMakeVisible (osc2WaveSelector);
     osc2WaveSelectorAttachment = std::make_unique<ComboBoxAttachment> (audioProcessor.apvts, "OSC2WAVETYPE", osc2WaveSelector);
 
@@ -348,6 +433,7 @@ BlueSynthAudioProcessorEditor::BlueSynthAudioProcessorEditor (BlueSynthAudioProc
     // JUCE's default LookAndFeel and misses AppLookAndFeel::createSliderTextBox's font. Now
     // that the whole tree is attached, this rebuilds every text box through the right one.
     sendLookAndFeelChange();
+    applyTheme (audioProcessor.getUiTheme());
 }
 
 BlueSynthAudioProcessorEditor::~BlueSynthAudioProcessorEditor()
@@ -387,6 +473,8 @@ static const juce::Colour kHotOutline { 0xffffb020 };
 
 void BlueSynthAudioProcessorEditor::timerCallback()
 {
+    if (displayedTheme != audioProcessor.getUiTheme())
+        applyTheme (audioProcessor.getUiTheme());
     undoButton.setEnabled (audioProcessor.undoManager.canUndo ());
     redoButton.setEnabled (audioProcessor.undoManager.canRedo ());
     lfoComponent.refresh();
@@ -455,33 +543,73 @@ void BlueSynthAudioProcessorEditor::timerCallback()
     if (newState2 != osc2ScopeState) { osc2ScopeState = newState2; repaint (kCol2X, kVisY, kColW, kVisH); }
 }
 
+void BlueSynthAudioProcessorEditor::applyTheme (int index)
+{
+    displayedTheme = juce::jlimit (0, 2, index);
+    getProperties().set (BlueTheme::themeProperty, displayedTheme);
+    const auto& properties = BlueTheme::colourProperties();
+    for (int i = 0; i < BlueTheme::colourCount; ++i)
+        getProperties().set (properties[(size_t) i], (juce::int64) audioProcessor.getUiThemeColour (i).getARGB());
+    themeSelector.setSelectedId (displayedTheme + 1, juce::dontSendNotification);
+    BlueTheme::applyToTree (*this, BlueTheme::forComponent (*this));
+    filterPanel.refreshTheme();
+    repaint();
+}
+
+void BlueSynthAudioProcessorEditor::editTheme()
+{
+    if (audioProcessor.getUiTheme() != 2)
+    {
+        audioProcessor.makeCustomThemeFromPreset (audioProcessor.getUiTheme());
+        applyTheme (2);
+    }
+    auto editor = std::make_unique<ThemeColourEditor> (audioProcessor,
+        [safe = juce::Component::SafePointer<BlueSynthAudioProcessorEditor> (this)]
+        {
+            if (safe != nullptr)
+                safe->applyTheme (2);
+        });
+    editor->getProperties().set (BlueTheme::themeProperty, 2);
+    const auto& properties = BlueTheme::colourProperties();
+    for (int i = 0; i < BlueTheme::colourCount; ++i)
+        editor->getProperties().set (properties[(size_t) i], (juce::int64) audioProcessor.getUiThemeColour (i).getARGB());
+    BlueTheme::applyToTree (*editor, BlueTheme::forComponent (*this));
+    juce::CallOutBox::launchAsynchronously (std::move (editor),
+                                            editThemeButton.getBounds(), this);
+}
+
 //==============================================================================
 void BlueSynthAudioProcessorEditor::paint (juce::Graphics& g)
 {
-    g.fillAll (juce::Colour (0xff4A90E2));
+    g.fillAll (BlueTheme::forComponent (*this).canvas);
 
-    // Title
-    g.setColour (juce::Colours::white);
+    g.setColour (BlueTheme::forComponent (*this).text);
     g.setFont (appFont (20.0f));
     g.drawText ("BLUESYNTH", 0, 4, getWidth(), 24, juce::Justification::centred);
 
     const int topPanelHeight = kTopPanelBottom - kToggleY;
-    g.drawRect (kCol1X, kToggleY, kColW, topPanelHeight, 1);
-    g.drawRect (kCol2X, kToggleY, kColW, topPanelHeight, 1);
-    g.drawRect (kBox3X, kToggleY, kBox1X + kBoxW - kBox3X, topPanelHeight, 1);
+    for (auto panel : { juce::Rectangle<int> (kCol1X, kToggleY, kColW, topPanelHeight),
+                        juce::Rectangle<int> (kCol2X, kToggleY, kColW, topPanelHeight),
+                        juce::Rectangle<int> (kBox3X, kToggleY, kBox1X + kBoxW - kBox3X, topPanelHeight) })
+    {
+        g.setColour (BlueTheme::forComponent (*this).panel);
+        g.fillRect (panel);
+        g.setColour (BlueTheme::forComponent (*this).border);
+        g.drawRect (panel);
+    }
 
     // Oscilloscope panel outlines — visible even when idle/silent, amber when that
     // oscillator has run out of headroom, red when the output itself is clipping.
     // Kept at 1px: the visualisers sit inset by exactly that much, so a thicker stroke
     // would cover the outer edge of the trace.
-    auto outlineColour = [] (ScopeState state)
+    auto outlineColour = [this] (ScopeState state)
     {
         switch (state)
         {
             case ScopeState::clipping: return juce::Colours::red;
             case ScopeState::hot:      return kHotOutline;
             case ScopeState::normal:
-            default:                   return juce::Colours::white;
+            default:                   return BlueTheme::forComponent (*this).border;
         }
     };
 
@@ -493,6 +621,9 @@ void BlueSynthAudioProcessorEditor::paint (juce::Graphics& g)
 
 void BlueSynthAudioProcessorEditor::resized()
 {
+    themeLabel.setBounds (12, 8, 216, 16);
+    themeSelector.setBounds (12, kPresetY, kCol1X - 84, 24);
+    editThemeButton.setBounds (kCol1X - 64, kPresetY, 52, 24);
     // Master controls — top right
     const int box1X = kBox1X;
     const int box2X = kBox2X;

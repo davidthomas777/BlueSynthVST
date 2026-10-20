@@ -9,6 +9,7 @@
 */
 
 #include "FilterCurveComponent.h"
+#include "AppFont.h"
 #include <complex>
 #include "../Data/FilterData.h"
 
@@ -91,7 +92,7 @@ float FilterCurveComponent::magnitudeAt (int filterType, float freq, float cutof
 
 void FilterCurveComponent::paint (juce::Graphics& g)
 {
-    g.fillAll (juce::Colour (0xff4A90E2));
+    g.fillAll (BlueTheme::forComponent (*this).inset);
 
     const auto bounds = getLocalBounds().toFloat();
     const int  width  = getWidth();
@@ -100,7 +101,7 @@ void FilterCurveComponent::paint (juce::Graphics& g)
 
     // Faint 0dB reference line
     const float zeroY = juce::jmap (0.0f, kMaxDb, kMinDb, bounds.getY(), bounds.getBottom());
-    g.setColour (juce::Colours::white.withAlpha (0.25f));
+    g.setColour (BlueTheme::forComponent (*this).text.withAlpha (0.25f));
     g.drawHorizontalLine ((int) zeroY, bounds.getX(), bounds.getRight());
 
     // The whole curve is drawn from the LIVE cutoff — base CUTOFF plus whatever the filter
@@ -137,10 +138,10 @@ void FilterCurveComponent::paint (juce::Graphics& g)
     fill.lineTo (bounds.getX(),     bounds.getBottom());
     fill.closeSubPath();
 
-    g.setColour (juce::Colours::white.withAlpha (0.15f));
+    g.setColour (BlueTheme::forComponent (*this).accent.withAlpha (0.16f));
     g.fillPath (fill);
 
-    g.setColour (juce::Colours::white);
+    g.setColour (BlueTheme::forComponent (*this).accent);
     g.strokePath (curve, juce::PathStrokeType (1.5f));
 
     // Live dot: rides the moving curve at its cutoff frequency. Same freq->x and dB->y
@@ -156,8 +157,8 @@ void FilterCurveComponent::paint (juce::Graphics& g)
 
     const float dotRadius = 4.0f;
     juce::Rectangle<float> dotBounds (dotX - dotRadius, dotY - dotRadius, dotRadius * 2.0f, dotRadius * 2.0f);
-    g.setColour (juce::Colours::black.withAlpha (0.6f));
+    g.setColour (BlueTheme::forComponent (*this).inset.withAlpha (0.6f));
     g.fillEllipse (dotBounds.expanded (1.0f));
-    g.setColour (juce::Colours::white);
+    g.setColour (BlueTheme::forComponent (*this).accent);
     g.fillEllipse (dotBounds);
 }

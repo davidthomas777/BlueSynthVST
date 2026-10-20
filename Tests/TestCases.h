@@ -3,6 +3,7 @@
 void oscillatorBounds();
 void instanceIsolation();
 void presetState();
+void themeState();
 void filters();
 void releaseTail();
 void filterEnvelopeStages();

@@ -38,6 +38,7 @@ public:
     // plus its actual live cutoff (CUTOFF plus whatever the filter envelope is adding)
     // for the curve's live dot.
     void updateCurve (int filterType, float cutoffHz, float resonance, float liveCutoffHz, double sampleRate, int slope);
+    void refreshTheme();
 
     void paint (juce::Graphics&) override;
     void resized() override;

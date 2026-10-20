@@ -85,7 +85,7 @@ void TopControlLookAndFeel::drawButtonBackground (
     g.setColour (colour);
     g.fillRect (button.getLocalBounds());
 
-    g.setColour (juce::Colours::white);
+    g.setColour (BlueTheme::forComponent (button).border);
     g.drawRect (button.getLocalBounds(), 1);
 }
 

@@ -207,6 +207,8 @@ void lfoState ()
 void lfoInterface ()
 {
     BlueSynthAudioProcessor p;
+    if (std::getenv ("BLUESYNTH_LFO_SNAPSHOT") != nullptr)
+        p.setUiTheme (1);
     std::unique_ptr<juce::AudioProcessorEditor> editor (p.createEditor ());
     std::array<int, Modulation::count> targets{};
     std::function<void (juce::Component &)> visit = [&] (juce::Component &component)

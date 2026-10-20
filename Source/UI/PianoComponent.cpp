@@ -9,6 +9,7 @@
 */
 
 #include "PianoComponent.h"
+#include "AppFont.h"
 
 namespace
 {
@@ -42,8 +43,8 @@ PianoComponent::~PianoComponent() = default;
 
 void PianoComponent::paint (juce::Graphics& g)
 {
-    // Matching every other panel's 1px white frame
-    g.setColour (juce::Colours::white);
+    // Match the other panel frames without changing the piano key colours.
+    g.setColour (BlueTheme::forComponent (*this).border);
     g.drawRect (getLocalBounds(), 1);
 }
 

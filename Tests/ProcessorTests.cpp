@@ -1,6 +1,8 @@
 #include "TestSupport.h"
 #include "TestCases.h"
 #include "UI/PresetComponent.h"
+#include "UI/AppFont.h"
+#include "UI/ModSlider.h"
 #include <thread>
 
 void instanceIsolation ()
@@ -54,6 +56,155 @@ static juce::ComboBox& presetBox (PresetComponent& component)
     for (auto* child : component.getChildren())
         if (auto* box = dynamic_cast<juce::ComboBox*> (child)) return *box;
     throw std::runtime_error ("Missing preset selector");
+}
+
+void themeState()
+{
+    BlueSynthAudioProcessor first, second;
+    std::unique_ptr<juce::AudioProcessorEditor> firstEditor (first.createEditor());
+    std::unique_ptr<juce::AudioProcessorEditor> secondEditor (second.createEditor());
+    require (first.getUiTheme() == 0 && second.getUiTheme() == 0, "New instances did not default to Classic Blue");
+
+    juce::ComboBox* selector = nullptr;
+    for (auto* child : firstEditor->getChildren())
+        if (child->getComponentID() == "UI_THEME")
+            selector = dynamic_cast<juce::ComboBox*> (child);
+    require (selector != nullptr && selector->getSelectedId() == 1, "Theme selector did not show Classic Blue");
+
+    juce::MidiKeyboardComponent* keyboard = nullptr;
+    std::function<void (juce::Component&)> findKeyboard = [&] (juce::Component& component)
+    {
+        if (auto* found = dynamic_cast<juce::MidiKeyboardComponent*> (&component))
+            keyboard = found;
+        for (auto* child : component.getChildren())
+            findKeyboard (*child);
+    };
+    findKeyboard (*firstEditor);
+    require (keyboard != nullptr, "Missing on-screen piano");
+    const auto originalPianoBlue = juce::Colour (0xff4a90e2);
+    require (keyboard->findColour (juce::MidiKeyboardComponent::keyDownOverlayColourId) ==
+                 originalPianoBlue.withAlpha (0.55f),
+             "Classic Blue changed the piano's original pressed-key colour");
+
+    Host host;
+    first.addListener (&host);
+    selector->setSelectedId (2, juce::sendNotificationSync);
+    require (first.getUiTheme() == 1 && host.notifications == 1, "Theme selection did not mark host state dirty");
+    require (BlueTheme::forComponent (*firstEditor).canvas == BlueTheme::midnight.canvas,
+             "Midnight palette was not applied to the selected editor");
+    require (keyboard->findColour (juce::MidiKeyboardComponent::keyDownOverlayColourId) ==
+                 BlueTheme::midnight.accent.withAlpha (0.55f),
+             "Midnight did not recolour the pressed-key overlay");
+    require (BlueTheme::forComponent (*secondEditor).canvas == BlueTheme::classic.canvas,
+             "Changing one instance affected another editor");
+    first.removeListener (&host);
+    selector->setSelectedId (1, juce::sendNotificationSync);
+
+    if (std::getenv ("BLUESYNTH_LFO_SNAPSHOT") != nullptr)
+    {
+        auto image = firstEditor->createComponentSnapshot (firstEditor->getLocalBounds(), true, 1.5f);
+        auto stream = juce::File ("/tmp/bluesynth-classic-ui.png").createOutputStream();
+        juce::PNGImageFormat png;
+        png.writeImageToStream (image, *stream);
+    }
+
+    juce::MemoryBlock saved;
+    first.getStateInformation (saved);
+    BlueSynthAudioProcessor restored;
+    restored.setStateInformation (saved.getData(), (int) saved.getSize());
+    require (restored.getUiTheme() == 0, "Theme choice did not survive project recall");
+    std::unique_ptr<juce::AudioProcessorEditor> reopened (restored.createEditor());
+    require (BlueTheme::forComponent (*reopened).canvas == BlueTheme::classic.canvas,
+             "Reopened editor did not use the saved theme");
+
+    juce::TextButton* editButton = nullptr;
+    for (auto* child : firstEditor->getChildren())
+        if (child->getComponentID() == "EDIT_THEME")
+            editButton = dynamic_cast<juce::TextButton*> (child);
+    require (editButton != nullptr, "Missing theme colour editor button");
+    selector->setSelectedId (2, juce::sendNotificationSync);
+    require (first.getUiTheme() == 1, "Theme selector did not switch back to Midnight");
+    editButton->onClick();
+    require (first.getUiTheme() == 2 && selector->getSelectedId() == 3,
+             "Editing a preset did not create a custom theme");
+    require (first.getUiThemeColour (0) == BlueTheme::midnight.canvas,
+             "Custom theme did not start from Midnight");
+    require (BlueTheme::forComponent (*firstEditor).canvas == BlueTheme::midnight.canvas,
+             "Editor did not apply the Midnight-based custom theme");
+
+    juce::ColourSelector* colourEditor = nullptr;
+    std::function<void (juce::Component&)> findColourEditor = [&] (juce::Component& component)
+    {
+        if (auto* found = dynamic_cast<juce::ColourSelector*> (&component))
+            colourEditor = found;
+        for (auto* child : component.getChildren())
+            findColourEditor (*child);
+    };
+    findColourEditor (*firstEditor);
+    require (colourEditor != nullptr, "Theme EDIT did not open the colour picker");
+    const juce::Colour customAccent { 0xffff8c5a };
+    colourEditor->setCurrentColour (customAccent, juce::sendNotification);
+    colourEditor->dispatchPendingMessages();
+    require (first.getUiTheme() == 2 && BlueTheme::forComponent (*firstEditor).accent == customAccent,
+             "Custom colour was not applied to the editor");
+    require (selector->findColour (juce::ComboBox::arrowColourId) == customAccent,
+             "Custom accent did not recolour controls");
+
+    ModSlider* modulationTarget = nullptr;
+    std::function<void (juce::Component&)> findTarget = [&] (juce::Component& component)
+    {
+        if (modulationTarget == nullptr)
+            modulationTarget = dynamic_cast<ModSlider*> (&component);
+        for (auto* child : component.getChildren())
+            findTarget (*child);
+    };
+    findTarget (*firstEditor);
+    require (modulationTarget != nullptr, "Missing LFO modulation target");
+    juce::Component hostWrapper;
+    hostWrapper.setSize (firstEditor->getWidth(), firstEditor->getHeight());
+    hostWrapper.addAndMakeVisible (firstEditor.get());
+    modulationTarget->editRoute (0);
+
+    juce::Component* routeEditor = nullptr;
+    std::function<void (juce::Component&)> findRoute = [&] (juce::Component& component)
+    {
+        if (component.getComponentID() == "LFO_ROUTE_EDITOR")
+            routeEditor = &component;
+        for (auto* child : component.getChildren())
+            findRoute (*child);
+    };
+    findRoute (hostWrapper);
+    require (routeEditor != nullptr, "LFO drop did not open the route editor");
+    require (BlueTheme::forComponent (*routeEditor).accent == customAccent,
+             "LFO route editor did not inherit the custom palette");
+    auto* routeCallout = routeEditor->findParentComponentOfClass<juce::CallOutBox>();
+    require (routeCallout != nullptr && &routeCallout->getLookAndFeel() == &routeEditor->getLookAndFeel(),
+             "LFO callout used the host's look and feel");
+    for (auto* child : routeEditor->getChildren())
+        if (auto* slider = dynamic_cast<juce::Slider*> (child))
+            require (slider->findColour (juce::Slider::trackColourId) == customAccent,
+                     "LFO route depth control kept its old theme");
+    if (std::getenv ("BLUESYNTH_LFO_SNAPSHOT") != nullptr)
+    {
+        auto image = hostWrapper.createComponentSnapshot (hostWrapper.getLocalBounds(), true, 1.5f);
+        auto stream = juce::File ("/tmp/bluesynth-route-ui.png").createOutputStream();
+        stream->setPosition (0);
+        stream->truncate();
+        juce::PNGImageFormat png;
+        png.writeImageToStream (image, *stream);
+    }
+
+    first.getStateInformation (saved);
+    restored.setStateInformation (saved.getData(), (int) saved.getSize());
+    require (restored.getUiTheme() == 2 && restored.getUiThemeColour (7) == customAccent,
+             "Custom colour did not survive project recall");
+
+    auto legacy = first.apvts.copyState();
+    legacy.removeProperty ("uiTheme", nullptr);
+    juce::AudioProcessor::copyXmlToBinary (*legacy.createXml(), saved);
+    restored.setStateInformation (saved.getData(), (int) saved.getSize());
+    require (restored.getUiTheme() == 0, "Legacy project inherited a previous theme");
+
 }
 
 void presetState ()

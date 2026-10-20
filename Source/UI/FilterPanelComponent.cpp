@@ -58,16 +58,23 @@ void FilterPanelComponent::SquareButtonLookAndFeel::drawButtonBackground (
     g.setColour (colour);
     g.fillRect (button.getLocalBounds());
 
-    g.setColour (juce::Colours::white);
+    g.setColour (BlueTheme::forComponent (button).border);
     g.drawRect (button.getLocalBounds(), 1);
 }
 
 void FilterPanelComponent::styleTab (juce::TextButton& tab, bool active)
 {
     tab.setColour (juce::TextButton::buttonColourId,
-                   active ? juce::Colours::white : juce::Colour (0xff4A90E2));
+                   active ? BlueTheme::forComponent (*this).accent : BlueTheme::forComponent (*this).control);
     tab.setColour (juce::TextButton::textColourOffId,
-                   active ? juce::Colour (0xff4A90E2) : juce::Colours::white);
+                   active ? BlueTheme::forComponent (*this).canvas : BlueTheme::forComponent (*this).text);
+}
+
+void FilterPanelComponent::refreshTheme()
+{
+    styleTab (filter1Tab, selected == 0);
+    styleTab (filter2Tab, selected == 1);
+    repaint();
 }
 
 void FilterPanelComponent::selectFilter (int index)
@@ -93,7 +100,7 @@ void FilterPanelComponent::updateCurve (int filterType, float cutoffHz, float re
 void FilterPanelComponent::paint (juce::Graphics& g)
 {
     // Outline around the curve display, matching the scopes' 1px white frame
-    g.setColour (juce::Colours::white);
+    g.setColour (BlueTheme::forComponent (*this).border);
     g.drawRect (curveDisplay.getBounds().expanded (1), 1);
 }
 

@@ -11,6 +11,7 @@ int main()
     for (const auto& test : { std::make_pair ("Oscillator bounds and FM transitions", oscillatorBounds),
                              std::make_pair ("Multiple plugin instances", instanceIsolation),
                              std::make_pair ("Preset selection and state restoration", presetState),
+                             std::make_pair ("Theme selection and project recall", themeState),
                              std::make_pair ("Filter types, slopes and sample rates", filters),
                              std::make_pair ("MIDI release and idle visualizer", releaseTail),
                              std::make_pair ("Filter ADSR stages, amount and cutoff limits", filterEnvelopeStages),

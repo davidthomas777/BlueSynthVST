@@ -13,6 +13,7 @@ Coverage:
 - All 13 oscillator waves at 32, 44.1, 48, and 96 kHz, including deep FM that crosses zero frequency and switching FM off.
 - Independent cutoff displays and first-note glide for multiple plugin instances; concurrent rendering and destruction of a separate instance.
 - Preset selector/timer ordering, host dirty notification, names absent from the preset directory, parameter edits, and restoration into a new processor/editor.
+- Classic Blue and Midnight selection, independent palettes across plugin instances, the original Classic Blue piano overlay, custom accent editing, themed LFO route popups inside a host wrapper, host dirty notification, and theme recall in a new processor/editor. New instances and legacy states default to Classic Blue. Set `BLUESYNTH_LFO_SNAPSHOT=1` for dark, classic, and custom LFO route editor snapshots in `/tmp`.
 - Legacy name/slope defaults, malformed data, and unrelated XML roots.
 - Fast 10 ms filter-envelope sweeps at low and high base cutoffs with positive and negative amounts and both retained mode indices, checking rendered filter cutoffs and uniform logarithmic graph travel at peak, midpoint and end. State tests verify the retained indices survive restoration while rendering uses the same mapping.
 - Filter centre-frequency gain, stereo isolation, and finite output for every type/slope at four sample rates; rapid type/slope/cutoff changes.

@@ -30,8 +30,8 @@ OscComponent::~OscComponent()
 
 void OscComponent::paint (juce::Graphics& g)
 {
-    g.fillAll (juce::Colour(0xff4A90E2));
-    g.setColour (juce::Colours::white);
+    g.fillAll (BlueTheme::forComponent (*this).panel);
+    g.setColour (BlueTheme::forComponent (*this).border);
     g.drawRect (getLocalBounds(), 1);
 }
 
@@ -65,16 +65,16 @@ void OscComponent::setSliderWithLabel (juce::Slider& slider, juce::Label& label,
     slider.setComponentID (paramId);
     slider.setSliderStyle (juce::Slider::SliderStyle::RotaryVerticalDrag);
     slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 38, 19);
-    slider.setColour (juce::Slider::thumbColourId,              juce::Colours::white);
-    slider.setColour (juce::Slider::rotarySliderFillColourId,   juce::Colours::white);
-    slider.setColour (juce::Slider::rotarySliderOutlineColourId, juce::Colours::black);
-    slider.setColour (juce::Slider::textBoxTextColourId,        juce::Colours::white);
-    slider.setColour (juce::Slider::textBoxOutlineColourId,     juce::Colours::white);
+    slider.setColour (juce::Slider::thumbColourId,              BlueTheme::forComponent (*this).text);
+    slider.setColour (juce::Slider::rotarySliderFillColourId,   BlueTheme::forComponent (*this).accent);
+    slider.setColour (juce::Slider::rotarySliderOutlineColourId, BlueTheme::forComponent (*this).border);
+    slider.setColour (juce::Slider::textBoxTextColourId,        BlueTheme::forComponent (*this).text);
+    slider.setColour (juce::Slider::textBoxOutlineColourId,     BlueTheme::forComponent (*this).border);
     addAndMakeVisible (slider);
 
     attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, paramId, slider);
     
-    label.setColour (juce::Label::ColourIds::textColourId, juce::Colours::white);
+    label.setColour (juce::Label::ColourIds::textColourId, BlueTheme::forComponent (*this).text);
     label.setFont (appFont (12.0f));
     label.setJustificationType (juce::Justification::centred);
     addAndMakeVisible (label);

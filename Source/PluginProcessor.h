@@ -56,6 +56,12 @@ public:
     //==============================================================================
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
+
+    int getUiTheme() const noexcept { return uiTheme.load (std::memory_order_relaxed); }
+    void setUiTheme (int index);
+    juce::Colour getUiThemeColour (int index) const;
+    void setUiThemeColour (int index, juce::Colour colour);
+    void makeCustomThemeFromPreset (int presetIndex);
     
     // Must outlive APVTS, which records parameter and modulation-state edits here.
     juce::UndoManager undoManager;
@@ -64,6 +70,8 @@ public:
     juce::AudioProcessorValueTreeState apvts;
     Modulation::Engine modulation { apvts };
     PresetManager presetManager;
+    std::atomic<int> uiTheme { 0 }; // UI only; 0 = Classic Blue, 1 = Midnight, 2 = Custom.
+    std::array<std::atomic<juce::uint32>, 9> customThemeColours;
 
     // Backs the on-screen piano in the editor. Clicking a key calls noteOn()/noteOff() here;
     // processBlock() merges those into the same MidiBuffer the host's MIDI arrives in, so the

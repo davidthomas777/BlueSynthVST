@@ -4,9 +4,7 @@ A dual-oscillator subtractive/FM synthesizer built with C++17 and JUCE 8. Availa
 
 [Features](#features) · [Build and install](#build-and-install) · [Tests](#tests) · [Architecture](docs/architecture.md) · [Source map](#source-map)
 
-![BlueSynth interface before slope selection](docs/screenshot.png)
-
-*Earlier UI snapshot; the current filter panel also includes a slope selector.*
+![BlueSynth Classic Blue interface with oscillator, filter, keyboard, and LFO panels](docs/screenshot-classic.png)
 
 ## Features
 
@@ -96,6 +94,10 @@ Older projects without name metadata cannot recover the original name automatica
 
 The interface uses bundled JetBrains Mono weights 400–800 from Google Fonts, with SF Mono as a system fallback. Font files and their [SIL Open Font License](Resources/Fonts/OFL.txt) are included for offline use.
 
+The [Midnight interface](docs/screenshot.png) groups each oscillator, its envelopes, and the filter into separate panels with matching muted blue borders. Cyan marks active controls and live curves. The left side is reserved for future controls.
+
+The **THEME** selector offers **Classic Blue**, the default bright blue and white look, and **Midnight**. Choose **EDIT** to start a **Custom** theme from the selected preset, then pick and adjust the background, panel, graph, control, border, text, accent, or knob-track colour. Theme settings belong to the plugin instance and are saved with the host project; older projects without a saved theme open in Classic Blue. Sound presets do not change the theme.
+
 - Two pitch-synchronized scopes, following a selected note rather than displaying a whole chord's sum.
 - Amber borders indicate an oscillator sum reaching full scale; red indicates output reaching full scale. These are meters, not limiters.
 - A filter curve showing type, slope, live resonance and envelope-modulated cutoff, including base-value updates while idle.
@@ -150,7 +152,7 @@ After adding, removing or renaming source files, update the .jucer project and r
 bash Tests/run.sh
 ```
 
-The runner builds Shared Code and executes **28 regression groups** for FM output, instance isolation, preset state, filters, MIDI releases, envelopes, voice-reuse pitch, glide compatibility, smoothing, undo/redo and LFO routing/timing/state/UI. It also prints an offline dense-polyphony timing comparison. It does not install plugins or modify preset files. Processor construction may create the preset directory if absent.
+The runner builds Shared Code and executes **29 regression groups** for FM output, instance isolation, preset and theme state, filters, MIDI releases, envelopes, voice-reuse pitch, glide compatibility, smoothing, undo/redo and LFO routing/timing/state/UI. It also prints an offline dense-polyphony timing comparison. It does not install plugins or modify preset files. Processor construction may create the preset directory if absent.
 
 See [test coverage and limitations](Tests/README.md). Offline passes do not establish FL Studio project compatibility, perceived sound quality or a CPU ceiling.
 

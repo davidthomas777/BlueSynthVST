@@ -36,6 +36,8 @@ public:
 
 private:
     void timerCallback() override;
+    void applyTheme (int index);
+    void editTheme();
 
     TopControlLookAndFeel editorLookAndFeel;
     // Used only by the OSC1/OSC2 Pitch/Oct/Gain and master Gain/Glide/Pitch knobs, whose
@@ -112,6 +114,10 @@ private:
     // ---- Master knobs ----
     juce::TextButton undoButton { "UNDO" };
     juce::TextButton redoButton { "REDO" };
+    juce::Label themeLabel;
+    juce::ComboBox themeSelector;
+    juce::TextButton editThemeButton { "EDIT" };
+    int displayedTheme { -1 };
     ModSlider gainSlider;
     juce::Label  gainLabel;
     ModSlider portamentoSlider;

@@ -31,6 +31,8 @@ BlueSynthAudioProcessorEditor
 
 `PluginProcessor` owns the audio objects and is called by the host. `PluginEditor` owns the controls and runs on JUCE's message thread. The editor never renders audio and the processor never depends on the editor being open.
 
+The processor also stores a UI-only theme index and custom colours as atomics. Host state serializes them as root properties; they are not audio parameters or sound-preset settings. Each editor reads its own processor's palette, applies control colours on the message thread, and resolves custom paint colours through its component tree. Theme changes notify the host of non-parameter state changes. New instances and legacy project state default to Classic Blue.
+
 `Data/ParameterLayout.cpp` defines the ordered APVTS parameters; keeping their IDs and choice indices stable preserves saved projects and automation. `Data/WaveformChoices.h` supplies the same waveform order to the parameter layout and editor menus. `UI/TopControlLookAndFeel.cpp` holds the top-row drawing code, separate from the editor's control wiring and layout.
 
 ## LFO ownership and rendering
